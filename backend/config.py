@@ -1,6 +1,6 @@
 import os
 
-DATABASE_URL = "postgresql://postgres:password@localhost/pandit_db"
+DATABASE_URL = "sqlite:///./pandit.db"
 
 SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"

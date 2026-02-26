@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Bookings - Pandit Booking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">🕉️ Pandit Booking</h1>
+            <ul class="nav-menu">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="services.html">Services</a></li>
+                <li><a href="pandits.html">Find Pandits</a></li>
+                <li><a href="bookings.html" class="active">My Bookings</a></li>
+                <li><a href="pandit-onboard.html">Become a Pandit</a></li>
+                <li><a href="manage-services.html">Manage Services</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>My Bookings</h2>
+            <p>View and manage your bookings</p>
+        </div>
+
+        <!-- Bookings List -->
+        <div id="bookingsList" class="bookings-list">
+            <p class="loading">Loading bookings...</p>
+        </div>
+
+        <!-- Review Modal -->
+        <div id="reviewModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close" onclick="closeReviewModal()">&times;</span>
+                <h3>Leave a Review</h3>
+                <form onsubmit="submitReview(event)">
+                    <input type="hidden" id="reviewBookingId">
+                    <input type="hidden" id="reviewPanditId">
+                    
+                    <div class="form-group">
+                        <label for="reviewRating">Rating (1-5)</label>
+                        <select id="reviewRating" required>
+                            <option value="5">⭐⭐⭐⭐⭐ Excellent</option>
+                            <option value="4">⭐⭐⭐⭐ Good</option>
+                            <option value="3">⭐⭐⭐ Average</option>
+                            <option value="2">⭐⭐ Below Average</option>
+                            <option value="1">⭐ Poor</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="reviewComment">Comment</label>
+                        <textarea id="reviewComment" rows="4" placeholder="Share your experience..." required></textarea>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Submit Review</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+        loadBookings();
+
+        async function loadBookings() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE_URL}/my-bookings`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                const bookings = await response.json();
+                displayBookings(bookings);
+            } catch (error) {
+                showMessage('Error loading bookings', 'error');
+            }
+        }
+
+        function displayBookings(bookings) {
+            const bookingsList = document.getElementById('bookingsList');
+            
+            if (bookings.length === 0) {
+                bookingsList.innerHTML = '<p class="no-results">No bookings found. <a href="pandits.html">Book a service</a></p>';
+                return;
+            }
+
+            bookingsList.innerHTML = bookings.map(booking => `
+                <div class="booking-card">
+                    <div class="booking-header">
+                        <h3>Booking #${booking.id.substring(0, 8)}</h3>
+                        <span class="status-badge status-${booking.status}">${booking.status}</span>
+                    </div>
+                    <div class="booking-details">
+                        <p><strong>Date:</strong> ${new Date(booking.booking_date).toLocaleString()}</p>
+                        <p><strong>Amount:</strong> ₹${booking.total_amount}</p>
+                        <p><strong>Service ID:</strong> ${booking.service_id}</p>
+                        <p><strong>Pandit ID:</strong> ${booking.pandit_id}</p>
+                    </div>
+                    ${booking.status === 'completed' ? 
+                        `<button onclick="openReviewModal('${booking.id}', '${booking.pandit_id}')" class="btn btn-secondary">Leave Review</button>` 
+                        : ''}
+                </div>
+            `).join('');
+        }
+
+        function openReviewModal(bookingId, panditId) {
+            document.getElementById('reviewBookingId').value = bookingId;
+            document.getElementById('reviewPanditId').value = panditId;
+            document.getElementById('reviewModal').classList.remove('hidden');
+        }
+
+        function closeReviewModal() {
+            document.getElementById('reviewModal').classList.add('hidden');
+        }
+
+        async function submitReview(event) {
+            event.preventDefault();
+            const token = localStorage.getItem('token');
+            const bookingId = document.getElementById('reviewBookingId').value;
+            const panditId = document.getElementById('reviewPanditId').value;
+            const rating = parseInt(document.getElementById('reviewRating').value);
+            const comment = document.getElementById('reviewComment').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/reviews`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        booking_id: bookingId,
+                        pandit_id: panditId,
+                        rating: rating,
+                        comment: comment
+                    })
+                });
+
+                if (response.ok) {
+                    showMessage('Review submitted successfully!', 'success');
+                    closeReviewModal();
+                    loadBookings();
+                } else {
+                    showMessage('Error submitting review', 'error');
+                }
+            } catch (error) {
+                showMessage('Error submitting review', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Pandits - Pandit Booking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">🕉️ Pandit Booking</h1>
+            <ul class="nav-menu">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="services.html">Services</a></li>
+                <li><a href="pandits.html" class="active">Find Pandits</a></li>
+                <li><a href="bookings.html">My Bookings</a></li>
+                <li><a href="pandit-onboard.html">Become a Pandit</a></li>
+                <li><a href="manage-services.html">Manage Services</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>Find Pandits</h2>
+            <p>Discover experienced pandits in your area</p>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <button onclick="loadNearbyPandits()" class="btn btn-primary">Find Nearby Pandits</button>
+            <button onclick="loadAllPandits()" class="btn btn-secondary">View All Pandits</button>
+        </div>
+
+        <!-- Pandits List -->
+        <div id="panditsList" class="pandits-grid">
+            <p class="loading">Click a button to load pandits...</p>
+        </div>
+
+        <!-- Booking Modal -->
+        <div id="bookingModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close" onclick="closeBookingModal()">&times;</span>
+                <h3>Book a Service</h3>
+                <form onsubmit="createBooking(event)">
+                    <input type="hidden" id="selectedPanditId">
+                    
+                    <div class="form-group">
+                        <label for="bookingService">Select Service</label>
+                        <select id="bookingService" required>
+                            <option value="">Loading services...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bookingDate">Booking Date & Time</label>
+                        <input type="datetime-local" id="bookingDate" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+
+        async function loadAllPandits() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/pandits`);
+                const pandits = await response.json();
+                displayPandits(pandits);
+            } catch (error) {
+                showMessage('Error loading pandits', 'error');
+            }
+        }
+
+        async function loadNearbyPandits() {
+            const token = localStorage.getItem('token');
+            try {
+                const response = await fetch(`${API_BASE_URL}/pandits/nearby?max_distance_km=50`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (response.status === 400) {
+                    showMessage('Please update your location in your profile first', 'error');
+                    return;
+                }
+                
+                const pandits = await response.json();
+                displayPandits(pandits, true);
+            } catch (error) {
+                showMessage('Error loading nearby pandits', 'error');
+            }
+        }
+
+        function displayPandits(pandits, showDistance = false) {
+            const panditsList = document.getElementById('panditsList');
+            
+            if (pandits.length === 0) {
+                panditsList.innerHTML = '<p class="no-results">No pandits found</p>';
+                return;
+            }
+
+            panditsList.innerHTML = pandits.map(pandit => `
+                <div class="pandit-card">
+                    <div class="pandit-header">
+                        <h3>Pandit Profile</h3>
+                        ${pandit.is_verified ? '<span class="verified-badge">✓ Verified</span>' : ''}
+                    </div>
+                    <div class="pandit-info">
+                        <p><strong>Experience:</strong> ${pandit.experience_years} years</p>
+                        <p><strong>Region:</strong> ${pandit.region}</p>
+                        <p><strong>Languages:</strong> ${pandit.languages}</p>
+                        ${pandit.location_name ? `<p><strong>Location:</strong> ${pandit.location_name}</p>` : ''}
+                        ${showDistance && pandit.distance_km ? `<p><strong>Distance:</strong> ${pandit.distance_km} km</p>` : ''}
+                        <p><strong>Rating:</strong> ⭐ ${pandit.rating_avg.toFixed(1)}/5</p>
+                        <p><strong>Price:</strong> ₹${pandit.price_per_service}</p>
+                        ${showDistance && pandit.match_score ? `<p><strong>Match Score:</strong> ${(pandit.match_score * 100).toFixed(0)}%</p>` : ''}
+                    </div>
+                    <div class="pandit-bio">
+                        <p>${pandit.bio}</p>
+                    </div>
+                    <button onclick="openBookingModal('${pandit.id}')" class="btn btn-primary">Book Now</button>
+                </div>
+            `).join('');
+        }
+
+        async function openBookingModal(panditId) {
+            document.getElementById('selectedPanditId').value = panditId;
+            document.getElementById('bookingModal').classList.remove('hidden');
+            
+            // Load services
+            try {
+                const response = await fetch(`${API_BASE_URL}/services`);
+                const services = await response.json();
+                const select = document.getElementById('bookingService');
+                select.innerHTML = services.map(s => 
+                    `<option value="${s.id}">${s.name} - ₹${s.base_price}</option>`
+                ).join('');
+            } catch (error) {
+                showMessage('Error loading services', 'error');
+            }
+        }
+
+        function closeBookingModal() {
+            document.getElementById('bookingModal').classList.add('hidden');
+        }
+
+        async function createBooking(event) {
+            event.preventDefault();
+            const token = localStorage.getItem('token');
+            const panditId = document.getElementById('selectedPanditId').value;
+            const serviceId = document.getElementById('bookingService').value;
+            const bookingDate = document.getElementById('bookingDate').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/bookings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        pandit_id: panditId,
+                        service_id: serviceId,
+                        booking_date: bookingDate
+                    })
+                });
+
+                if (response.ok) {
+                    showMessage('Booking created successfully!', 'success');
+                    closeBookingModal();
+                    setTimeout(() => location.href = 'bookings.html', 1500);
+                } else {
+                    showMessage('Error creating booking', 'error');
+                }
+            } catch (error) {
+                showMessage('Error creating booking', 'error');
+            }
+        }
+    </script>
+</body>
+</html>

@@ -7,7 +7,15 @@ router = APIRouter()
 
 @router.post("/bookings")
 def create_booking(data: schemas.BookingCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+    from fastapi import HTTPException
+    
     service = db.query(models.Service).filter(models.Service.id == data.service_id).first()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+    
+    # Validate that the pandit owns this service
+    if service.pandit_id != data.pandit_id:
+        raise HTTPException(status_code=400, detail="Service is not offered by the specified pandit")
 
     booking = models.Booking(
         user_id=user.id,

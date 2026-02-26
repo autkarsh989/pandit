@@ -4,4 +4,4 @@ sqlalchemy
 passlib[bcrypt]
 python-jose
 pydantic
-python-multipart
+python-multipartrequests

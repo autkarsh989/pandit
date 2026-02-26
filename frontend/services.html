@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Services - Pandit Booking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">🕉️ Pandit Booking</h1>
+            <ul class="nav-menu">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="services.html" class="active">Services</a></li>
+                <li><a href="pandits.html">Find Pandits</a></li>
+                <li><a href="bookings.html">My Bookings</a></li>
+                <li><a href="pandit-onboard.html">Become a Pandit</a></li>
+                <li><a href="manage-services.html">Manage Services</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>Available Services</h2>
+            <p>Browse and search for spiritual services</p>
+        </div>
+
+        <!-- Search and Filter -->
+        <div class="search-section">
+            <input type="text" id="searchKeyword" placeholder="Search services..." class="search-input">
+            <button onclick="searchServices()" class="btn btn-primary">Search</button>
+        </div>
+
+        <div class="filter-section">
+            <select id="sortBy" onchange="searchServices()">
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+                <option value="name_asc">Name: A to Z</option>
+                <option value="name_desc">Name: Z to A</option>
+            </select>
+        </div>
+
+        <!-- Services List -->
+        <div id="servicesList" class="services-grid">
+            <p class="loading">Loading services...</p>
+        </div>
+
+        <!-- Pandit Selection Modal -->
+        <div id="panditSelectionModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close" onclick="closePanditSelectionModal()">&times;</span>
+                <h3 id="selectedServiceName">Select a Pandit</h3>
+                <p id="selectedServiceDetails"></p>
+                <input type="hidden" id="selectedServiceId">
+                
+                <div id="panditSelectionList" class="pandit-selection-grid">
+                    <p class="loading">Loading available pandits...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Booking Confirmation Modal -->
+        <div id="bookingConfirmModal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close" onclick="closeBookingConfirmModal()">&times;</span>
+                <h3>Confirm Your Booking</h3>
+                <form onsubmit="confirmBooking(event)">
+                    <input type="hidden" id="finalPanditId">
+                    <input type="hidden" id="finalServiceId">
+                    
+                    <div class="booking-summary">
+                        <div id="bookingSummaryDetails"></div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="bookingDateTime">Booking Date & Time</label>
+                        <input type="datetime-local" id="bookingDateTime" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Confirm Booking</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+        loadServices();
+
+        async function loadServices() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/services`);
+                const services = await response.json();
+                displayServices(services);
+            } catch (error) {
+                showMessage('Error loading services', 'error');
+            }
+        }
+
+        async function searchServices() {
+            const keyword = document.getElementById('searchKeyword').value;
+            const sortBy = document.getElementById('sortBy').value;
+            
+            try {
+                let url = `${API_BASE_URL}/services/search?sort_by=${sortBy}`;
+                if (keyword) {
+                    url += `&keyword=${encodeURIComponent(keyword)}`;
+                }
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                displayServices(data.items || data);
+            } catch (error) {
+                showMessage('Error searching services', 'error');
+            }
+        }
+
+        function displayServices(services) {
+            const servicesList = document.getElementById('servicesList');
+            
+            if (services.length === 0) {
+                servicesList.innerHTML = '<p class="no-results">No services found</p>';
+                return;
+            }
+
+            servicesList.innerHTML = services.map(service => `
+                <div class="service-card">
+                    <h3>${service.name}</h3>
+                    <p class="category">Category: ${service.category}</p>
+                    <p class="price">₹${service.base_price}</p>
+                    <p class="duration">Duration: ${service.duration_minutes} minutes</p>
+                    <button onclick='bookService(${JSON.stringify(service)})' class="btn btn-primary" style="margin-top: 15px;">Book This Service</button>
+                </div>
+            `).join('');
+        }
+
+        // Book a service - show available pandits
+        async function bookService(service) {
+            document.getElementById('selectedServiceId').value = service.id;
+            document.getElementById('selectedServiceName').textContent = `Book: ${service.name}`;
+            document.getElementById('selectedServiceDetails').innerHTML = `
+                <strong>Category:</strong> ${service.category} | 
+                <strong>Price:</strong> ₹${service.base_price} | 
+                <strong>Duration:</strong> ${service.duration_minutes} min
+            `;
+            
+            // Load all pandits
+            try {
+                const response = await fetch(`${API_BASE_URL}/pandits`);
+                const pandits = await response.json();
+                displayPanditSelection(pandits, service);
+                document.getElementById('panditSelectionModal').classList.remove('hidden');
+            } catch (error) {
+                showMessage('Error loading pandits', 'error');
+            }
+        }
+
+        function displayPanditSelection(pandits, service) {
+            const panditList = document.getElementById('panditSelectionList');
+            
+            if (pandits.length === 0) {
+                panditList.innerHTML = '<p class="no-results">No pandits available</p>';
+                return;
+            }
+
+            panditList.innerHTML = pandits.map(pandit => `
+                <div class="pandit-select-card">
+                    <div class="pandit-select-header">
+                        <h4>Pandit Profile</h4>
+                        ${pandit.is_verified ? '<span class="verified-badge">✓ Verified</span>' : ''}
+                    </div>
+                    <p><strong>Experience:</strong> ${pandit.experience_years} years</p>
+                    <p><strong>Region:</strong> ${pandit.region}</p>
+                    <p><strong>Languages:</strong> ${pandit.languages}</p>
+                    <p><strong>Rating:</strong> ⭐ ${pandit.rating_avg.toFixed(1)}/5</p>
+                    <p class="pandit-bio-short">${pandit.bio.substring(0, 100)}...</p>
+                    <button onclick='selectPandit(${JSON.stringify(pandit)}, ${JSON.stringify(service)})' class="btn btn-secondary" style="margin-top: 10px;">Select This Pandit</button>
+                </div>
+            `).join('');
+        }
+
+        function selectPandit(pandit, service) {
+            document.getElementById('finalPanditId').value = pandit.id;
+            document.getElementById('finalServiceId').value = service.id;
+            document.getElementById('bookingSummaryDetails').innerHTML = `
+                <p><strong>Service:</strong> ${service.name}</p>
+                <p><strong>Category:</strong> ${service.category}</p>
+                <p><strong>Price:</strong> ₹${service.base_price}</p>
+                <p><strong>Duration:</strong> ${service.duration_minutes} minutes</p>
+                <hr style="margin: 15px 0;">
+                <p><strong>Pandit Region:</strong> ${pandit.region}</p>
+                <p><strong>Experience:</strong> ${pandit.experience_years} years</p>
+                <p><strong>Languages:</strong> ${pandit.languages}</p>
+                <p><strong>Rating:</strong> ⭐ ${pandit.rating_avg.toFixed(1)}/5</p>
+            `;
+            
+            closePanditSelectionModal();
+            document.getElementById('bookingConfirmModal').classList.remove('hidden');
+        }
+
+        async function confirmBooking(event) {
+            event.preventDefault();
+            const token = localStorage.getItem('token');
+            const panditId = document.getElementById('finalPanditId').value;
+            const serviceId = document.getElementById('finalServiceId').value;
+            const bookingDate = document.getElementById('bookingDateTime').value;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/bookings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        pandit_id: panditId,
+                        service_id: serviceId,
+                        booking_date: bookingDate
+                    })
+                });
+
+                if (response.ok) {
+                    showMessage('Booking created successfully!', 'success');
+                    closeBookingConfirmModal();
+                    setTimeout(() => location.href = 'bookings.html', 1500);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Error creating booking', 'error');
+                }
+            } catch (error) {
+                showMessage('Error creating booking', 'error');
+            }
+        }
+
+        function closePanditSelectionModal() {
+            document.getElementById('panditSelectionModal').classList.add('hidden');
+        }
+
+        function closeBookingConfirmModal() {
+            document.getElementById('bookingConfirmModal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>

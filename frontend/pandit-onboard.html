@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Become a Pandit - Pandit Booking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">🕉️ Pandit Booking</h1>
+            <ul class="nav-menu">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="services.html">Services</a></li>
+                <li><a href="pandits.html">Find Pandits</a></li>
+                <li><a href="bookings.html">My Bookings</a></li>
+                <li><a href="pandit-onboard.html" class="active">Become a Pandit</a></li>
+                <li><a href="manage-services.html">Manage Services</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>🙏 Become a Pandit</h2>
+            <p>Join our platform and offer your spiritual services</p>
+        </div>
+
+        <div class="onboard-container">
+            <div class="onboard-info">
+                <h3>Why Join as a Pandit?</h3>
+                <ul class="benefits-list">
+                    <li>✓ Reach more devotees in your area</li>
+                    <li>✓ Manage your bookings efficiently</li>
+                    <li>✓ Build your reputation with reviews</li>
+                    <li>✓ Set your own pricing</li>
+                    <li>✓ Verified badge for credibility</li>
+                </ul>
+            </div>
+
+            <div class="onboard-form-container">
+                <h3>Pandit Registration Form</h3>
+                <form id="panditOnboardForm" onsubmit="handlePanditOnboard(event)">
+                    <div class="form-group">
+                        <label for="experienceYears">Years of Experience *</label>
+                        <input type="number" id="experienceYears" min="0" max="100" placeholder="Enter years of experience" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bio">Bio / About Yourself *</label>
+                        <textarea id="bio" rows="4" placeholder="Tell us about your expertise, specializations, and background..." required></textarea>
+                        <small>Share your experience, areas of expertise, and what makes you unique</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="region">Region / Area *</label>
+                        <input type="text" id="region" placeholder="e.g., Mumbai, Delhi NCR, Bangalore" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="languages">Languages Known *</label>
+                        <input type="text" id="languages" placeholder="e.g., Hindi, English, Sanskrit, Tamil" required>
+                        <small>Separate multiple languages with commas</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="locationName">Location Name</label>
+                        <input type="text" id="locationName" placeholder="e.g., Andheri West, Connaught Place">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="latitude">Latitude (Optional)</label>
+                            <input type="number" id="latitude" step="any" placeholder="e.g., 19.0760">
+                            <button type="button" class="btn-location" onclick="getCurrentLocation()">📍 Get Current Location</button>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="longitude">Longitude (Optional)</label>
+                            <input type="number" id="longitude" step="any" placeholder="e.g., 72.8777">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pricePerService">Price per Service (₹) *</label>
+                        <input type="number" id="pricePerService" min="0" step="100" placeholder="e.g., 2100" required>
+                        <small>Base price for your services (can vary per service type)</small>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Submit Application</button>
+                        <button type="button" class="btn btn-secondary" onclick="location.href='dashboard.html'">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div id="message" class="message"></div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        document.getElementById('latitude').value = position.coords.latitude;
+                        document.getElementById('longitude').value = position.coords.longitude;
+                        showMessage('Location captured successfully!', 'success');
+                    },
+                    (error) => {
+                        showMessage('Unable to get location. Please enter manually.', 'error');
+                        console.error('Geolocation error:', error);
+                    }
+                );
+            } else {
+                showMessage('Geolocation is not supported by this browser.', 'error');
+            }
+        }
+
+        async function handlePanditOnboard(event) {
+            event.preventDefault();
+            
+            const token = localStorage.getItem('token');
+            const data = {
+                experience_years: parseInt(document.getElementById('experienceYears').value),
+                bio: document.getElementById('bio').value,
+                region: document.getElementById('region').value,
+                languages: document.getElementById('languages').value,
+                location_name: document.getElementById('locationName').value || null,
+                latitude: parseFloat(document.getElementById('latitude').value) || null,
+                longitude: parseFloat(document.getElementById('longitude').value) || null,
+                price_per_service: parseFloat(document.getElementById('pricePerService').value)
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/pandit/onboard`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showMessage('Congratulations! Your pandit profile has been created successfully!', 'success');
+                    setTimeout(() => {
+                        location.href = 'dashboard.html';
+                    }, 2000);
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Failed to create pandit profile. You may already be registered as a pandit.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+                console.error('Pandit onboard error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Services - Pandit Booking</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-logo">🕉️ Pandit Booking</h1>
+            <ul class="nav-menu">
+                <li><a href="dashboard.html">Dashboard</a></li>
+                <li><a href="services.html">Services</a></li>
+                <li><a href="pandits.html">Find Pandits</a></li>
+                <li><a href="bookings.html">My Bookings</a></li>
+                <li><a href="pandit-onboard.html">Become a Pandit</a></li>
+                <li><a href="manage-services.html" class="active">Manage Services</a></li>
+                <li><a href="#" onclick="logout()">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="page-header">
+            <h2>📋 Manage Services</h2>
+            <p>Add and manage spiritual services offered on the platform</p>
+        </div>
+
+        <div class="service-management">
+            <!-- Add Service Form -->
+            <div class="add-service-section">
+                <h3>Add New Service</h3>
+                <form id="addServiceForm" onsubmit="handleAddService(event)">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="serviceName">Service Name *</label>
+                            <input type="text" id="serviceName" placeholder="e.g., Griha Pravesh Puja" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="serviceCategory">Category *</label>
+                            <select id="serviceCategory" required>
+                                <option value="">Select Category</option>
+                                <option value="Puja">Puja</option>
+                                <option value="Hawan">Hawan</option>
+                                <option value="Wedding">Wedding Ceremony</option>
+                                <option value="Naming">Naming Ceremony</option>
+                                <option value="Astrology">Astrology Consultation</option>
+                                <option value="Festival">Festival Puja</option>
+                                <option value="Ritual">Special Ritual</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="basePrice">Base Price (₹) *</label>
+                            <input type="number" id="basePrice" min="0" step="100" placeholder="e.g., 2100" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="durationMinutes">Duration (minutes) *</label>
+                            <input type="number" id="durationMinutes" min="15" step="15" placeholder="e.g., 120" required>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Add Service</button>
+                        <button type="reset" class="btn btn-secondary">Clear Form</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Quick Add Templates -->
+            <div class="quick-add-section">
+                <h3>Quick Add - Popular Services</h3>
+                <p class="help-text">Click to quickly add common services</p>
+                <div class="quick-add-grid">
+                    <button class="quick-add-btn" onclick="addQuickService('Satyanarayan Puja', 'Puja', 2100, 180)">
+                        Satyanarayan Puja
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Griha Pravesh Puja', 'Puja', 3500, 240)">
+                        Griha Pravesh Puja
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Ganesh Chaturthi Puja', 'Festival', 2500, 120)">
+                        Ganesh Chaturthi Puja
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Navratri Hawan', 'Hawan', 5100, 300)">
+                        Navratri Hawan
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Vivah Sanskar', 'Wedding', 11000, 480)">
+                        Vivah Sanskar
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Namkaran Ceremony', 'Naming', 2100, 90)">
+                        Namkaran Ceremony
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Kundli Reading', 'Astrology', 1100, 60)">
+                        Kundli Reading
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Rudrabhishek', 'Puja', 3100, 150)">
+                        Rudrabhishek
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Lakshmi Puja', 'Puja', 2100, 120)">
+                        Lakshmi Puja
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Durga Puja', 'Festival', 5100, 240)">
+                        Durga Puja
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Shradh Ceremony', 'Ritual', 3500, 180)">
+                        Shradh Ceremony
+                    </button>
+                    <button class="quick-add-btn" onclick="addQuickService('Vastu Consultation', 'Astrology', 2100, 90)">
+                        Vastu Consultation
+                    </button>
+                </div>
+            </div>
+
+            <!-- Existing Services -->
+            <div class="existing-services-section">
+                <h3>Existing Services on Platform</h3>
+                <button onclick="loadAllServicesManage()" class="btn btn-secondary">Refresh List</button>
+                <div id="existingServicesList" class="existing-services-list">
+                    <p class="loading">Click refresh to load services...</p>
+                </div>
+            </div>
+        </div>
+
+        <div id="message" class="message"></div>
+    </div>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    <script>
+        checkAuth();
+        loadAllServicesManage();
+
+        async function handleAddService(event) {
+            event.preventDefault();
+            
+            const data = {
+                name: document.getElementById('serviceName').value,
+                category: document.getElementById('serviceCategory').value,
+                base_price: parseFloat(document.getElementById('basePrice').value),
+                duration_minutes: parseInt(document.getElementById('durationMinutes').value)
+            };
+
+            await addService(data);
+        }
+
+        async function addService(data) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/services`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showMessage(`Service "${data.name}" added successfully!`, 'success');
+                    document.getElementById('addServiceForm').reset();
+                    loadAllServicesManage();
+                } else {
+                    const error = await response.json();
+                    showMessage(error.detail || 'Failed to add service.', 'error');
+                }
+            } catch (error) {
+                showMessage('Network error. Please try again.', 'error');
+                console.error('Add service error:', error);
+            }
+        }
+
+        async function addQuickService(name, category, price, duration) {
+            const data = {
+                name: name,
+                category: category,
+                base_price: price,
+                duration_minutes: duration
+            };
+            
+            await addService(data);
+        }
+
+        async function loadAllServicesManage() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/services`);
+                const services = await response.json();
+                displayExistingServices(services);
+            } catch (error) {
+                showMessage('Error loading services', 'error');
+            }
+        }
+
+        function displayExistingServices(services) {
+            const servicesList = document.getElementById('existingServicesList');
+            
+            if (services.length === 0) {
+                servicesList.innerHTML = '<p class="no-results">No services found. Add some services above!</p>';
+                return;
+            }
+
+            servicesList.innerHTML = `
+                <table class="services-table">
+                    <thead>
+                        <tr>
+                            <th>Service Name</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${services.map(service => `
+                            <tr>
+                                <td><strong>${service.name}</strong></td>
+                                <td><span class="category-badge">${service.category}</span></td>
+                                <td>₹${service.base_price}</td>
+                                <td>${service.duration_minutes} min</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+    </script>
+</body>
+</html>

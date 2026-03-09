@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
 import models, schemas
 from auth import get_current_pandit, get_db
+from utils import save_profile_picture, delete_profile_picture
 
 router = APIRouter()
 
@@ -11,6 +12,44 @@ router = APIRouter()
 @router.get("/pandit/profile", response_model=schemas.PanditResponse)
 def get_profile(pandit=Depends(get_current_pandit)):
     return pandit
+
+# Upload/Update pandit profile picture
+@router.post("/pandit/profile/picture")
+def upload_profile_picture(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    pandit=Depends(get_current_pandit)
+):
+    """Upload or update pandit profile picture"""
+    # Delete old profile picture if exists
+    if pandit.profile_picture:
+        delete_profile_picture(pandit.profile_picture)
+    
+    # Save new profile picture
+    file_path = save_profile_picture(file, pandit.id, "pandit")
+    pandit.profile_picture = file_path
+    
+    db.commit()
+    return {
+        "msg": "Profile picture uploaded successfully",
+        "profile_picture": file_path
+    }
+
+# Delete pandit profile picture
+@router.delete("/pandit/profile/picture")
+def delete_pandit_profile_picture(
+    db: Session = Depends(get_db),
+    pandit=Depends(get_current_pandit)
+):
+    """Delete pandit profile picture"""
+    if not pandit.profile_picture:
+        raise HTTPException(status_code=404, detail="No profile picture to delete")
+    
+    delete_profile_picture(pandit.profile_picture)
+    pandit.profile_picture = None
+    
+    db.commit()
+    return {"msg": "Profile picture deleted successfully"}
 
 # Update pandit profile
 @router.put("/pandit/profile")

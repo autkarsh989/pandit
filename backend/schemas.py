@@ -21,6 +21,7 @@ class UserResponse(BaseModel):
     full_name: str
     phone: str
     email: Optional[str]
+    profile_picture: Optional[str]
     latitude: Optional[float]
     longitude: Optional[float]
     location_name: Optional[str]
@@ -71,6 +72,7 @@ class PanditResponse(BaseModel):
     full_name: str
     phone: str
     email: Optional[str]
+    profile_picture: Optional[str]
     experience_years: int
     bio: str
     region: str
@@ -90,6 +92,7 @@ class PanditWithDistance(BaseModel):
     full_name: str
     phone: str
     email: Optional[str]
+    profile_picture: Optional[str]
     experience_years: int
     bio: str
     region: str

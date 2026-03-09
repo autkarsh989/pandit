@@ -4,4 +4,11 @@ sqlalchemy
 passlib[bcrypt]
 python-jose
 pydantic
-python-multipartrequests
+python-multipart
+litellm
+Pillow
+reportlab
+pyswisseph
+geopy
+timezonefinder
+pytz

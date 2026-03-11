@@ -92,55 +92,72 @@ export default function PanditOnboard() {
   };
 
   return (
-    <div className="container">
-        <div className="page-header">
-          <h2>Become a Pandit</h2>
-          <p>Create a pandit account to offer your spiritual services</p>
+    <div className="onboard-page">
+      <header className="auth-topbar">
+        <div className="auth-brand">
+          <div className="auth-logo">OM</div>
+          <div>
+            <p className="auth-brand-title">PANDIT</p>
+            <p className="auth-brand-subtitle">Partner Portal</p>
+          </div>
         </div>
+        <div className="auth-topbar-actions">
+          <button type="button" className="icon-pill">?</button>
+          <button type="button" className="link-button" onClick={() => navigate('/')}>
+            Already a partner? <span className="accent">Login</span>
+          </button>
+        </div>
+      </header>
 
       {message.text ? (
         <div className={`message ${message.type}`}>{message.text}</div>
       ) : null}
 
-      <div className="onboard-container">
-        <div className="onboard-info">
-          <h3>Why Join as a Pandit?</h3>
-          <ul className="benefits-list">
-            <li>Reach more devotees in your area</li>
-            <li>Manage your bookings efficiently</li>
-            <li>Build your reputation with reviews</li>
-            <li>Set your own pricing</li>
-            <li>Verified badge for credibility</li>
-          </ul>
+      <div className="onboard-card">
+        <div className="onboard-header">
+          <h2>Professional Details</h2>
+          <p>Please fill in your authentic information to build trust with your future clients.</p>
         </div>
 
-        <div className="onboard-form-container">
-          <h3>Pandit Registration Form</h3>
-          <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="onboard-form">
+          <div className="form-row">
             <div className="form-group">
-              <label htmlFor="fullName">Full Name *</label>
+              <label htmlFor="fullName">Full Name</label>
               <input
                 type="text"
                 id="fullName"
+                placeholder="e.g. Acharya Sharma"
                 required
                 value={form.fullName}
                 onChange={handleChange('fullName')}
               />
             </div>
-
             <div className="form-group">
-              <label htmlFor="phone">Phone Number *</label>
+              <label htmlFor="phone">Phone Number</label>
               <input
                 type="tel"
                 id="phone"
+                placeholder="+91 00000 00000"
                 required
                 value={form.phone}
                 onChange={handleChange('phone')}
               />
             </div>
+          </div>
 
+          <div className="form-row">
             <div className="form-group">
-              <label htmlFor="password">Password *</label>
+              <label htmlFor="email">Email Address</label>
+              <input
+                type="email"
+                id="email"
+                placeholder="acharya@example.com"
+                value={form.email}
+                onChange={handleChange('email')}
+              />
+            </div>
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
               <input
                 type="password"
                 id="password"
@@ -149,119 +166,88 @@ export default function PanditOnboard() {
                 onChange={handleChange('password')}
               />
             </div>
+          </div>
 
+          <div className="form-row">
             <div className="form-group">
-              <label htmlFor="email">Email (Optional)</label>
-              <input
-                type="email"
-                id="email"
-                value={form.email}
-                onChange={handleChange('email')}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="experienceYears">Years of Experience *</label>
+              <label htmlFor="experienceYears">Years of Experience</label>
               <input
                 type="number"
                 id="experienceYears"
                 min="0"
                 max="100"
-                placeholder="Enter years of experience"
+                placeholder="Select experience"
                 required
                 value={form.experienceYears}
                 onChange={handleChange('experienceYears')}
               />
             </div>
-
             <div className="form-group">
-              <label htmlFor="bio">Bio / About Yourself *</label>
-              <textarea
-                id="bio"
-                rows="4"
-                placeholder="Tell us about your expertise, specializations, and background..."
-                required
-                value={form.bio}
-                onChange={handleChange('bio')}
-              />
-              <small>Share your experience, areas of expertise, and what makes you unique</small>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="region">Region / Area *</label>
-              <input
-                type="text"
-                id="region"
-                placeholder="e.g., Mumbai, Delhi NCR, Bangalore"
-                required
-                value={form.region}
-                onChange={handleChange('region')}
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="languages">Languages Known *</label>
-              <input
-                type="text"
-                id="languages"
-                placeholder="e.g., Hindi, English, Sanskrit, Tamil"
-                required
-                value={form.languages}
-                onChange={handleChange('languages')}
-              />
-              <small>Separate multiple languages with commas</small>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="locationName">Location Name</label>
-              <input
-                type="text"
-                id="locationName"
-                placeholder="e.g., Andheri West, Connaught Place"
-                value={form.locationName}
-                onChange={handleChange('locationName')}
-              />
-            </div>
-
-            <div className="form-group">
-              <label>GPS Location</label>
-              <button type="button" className="btn-location" onClick={getCurrentLocation}>
-                {locating ? 'Capturing...' : 'Get Current Location'}
-              </button>
-              <p className="helper-text">
-                We use this to connect you with devotees nearby.
-              </p>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="pricePerService">Price per Service (Rs) *</label>
+              <label htmlFor="pricePerService">Price per Service (Starting)</label>
               <input
                 type="number"
                 id="pricePerService"
                 min="0"
                 step="100"
-                placeholder="e.g., 2100"
+                placeholder="Rs  1100"
                 required
                 value={form.pricePerService}
                 onChange={handleChange('pricePerService')}
               />
-              <small>Base price for your services (can vary per service type)</small>
             </div>
+          </div>
 
-            <div className="form-actions">
-              <button type="submit" className="btn btn-primary">
-                Submit Application
-              </button>
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => navigate('/')}
-              >
-                Cancel
-              </button>
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="region">Primary Region</label>
+              <input
+                type="text"
+                id="region"
+                placeholder="e.g. Varanasi, Uttar Pradesh"
+                required
+                value={form.region}
+                onChange={handleChange('region')}
+              />
             </div>
-          </form>
-        </div>
+            <div className="form-group">
+              <label htmlFor="languages">Languages Known</label>
+              <input
+                type="text"
+                id="languages"
+                placeholder="Hindi, Sanskrit, English"
+                required
+                value={form.languages}
+                onChange={handleChange('languages')}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="bio">Professional Bio</label>
+            <textarea
+              id="bio"
+              rows="4"
+              placeholder="Tell us about your background, expertise in specific rituals, and your spiritual philosophy."
+              required
+              value={form.bio}
+              onChange={handleChange('bio')}
+            />
+          </div>
+
+          <div className="kyc-note">
+            <strong>KYC Verification:</strong> After submission, our team will review your
+            profile. A verification badge will be granted upon successful document review.
+          </div>
+
+          <div className="form-actions">
+            <button type="submit" className="btn btn-primary full-width">
+              Complete Registration ->
+            </button>
+          </div>
+          <p className="policy-text">
+            By clicking register, you agree to PANDIT&apos;s Terms of Service and Privacy Policy.
+          </p>
+        </form>
       </div>
     </div>
   );

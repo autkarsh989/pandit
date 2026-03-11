@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from typing import Optional
 import models, schemas
 from auth import get_current_user, get_db
@@ -116,7 +116,8 @@ def search_services(
         query = query.filter(
             or_(
                 models.Service.name.ilike(f"%{keyword}%"),
-                models.Service.category.ilike(f"%{keyword}%")
+                models.Service.category.ilike(f"%{keyword}%"),
+                models.Service.description.ilike(f"%{keyword}%")
             )
         )
     
@@ -182,6 +183,19 @@ def search_pandits(
     # Only show verified pandits to users
     pandits = db.query(models.Pandit).filter(models.Pandit.is_verified == True).all()
     matches = []
+    pandit_ids = [pandit.id for pandit in pandits]
+    review_counts = {}
+    if pandit_ids:
+        rows = (
+            db.query(models.Review.reviewee_id, func.count(models.Review.id))
+            .filter(
+                models.Review.reviewee_type == "pandit",
+                models.Review.reviewee_id.in_(pandit_ids),
+            )
+            .group_by(models.Review.reviewee_id)
+            .all()
+        )
+        review_counts = {row[0]: row[1] for row in rows}
     
     for pandit in pandits:
         if not pandit.latitude or not pandit.longitude:
@@ -221,7 +235,8 @@ def search_pandits(
             rating_avg=pandit.rating_avg,
             is_verified=pandit.is_verified,
             distance_km=round(distance, 2),
-            match_score=match_score
+            match_score=match_score,
+            review_count=review_counts.get(pandit.id, 0)
         )
         matches.append(pandit_with_distance)
     
@@ -249,7 +264,32 @@ def get_pandit_detail(
         raise HTTPException(status_code=404, detail="Pandit not found")
     if not pandit.is_verified:
         raise HTTPException(status_code=403, detail="Pandit is not verified")
-    return pandit
+    review_count = (
+        db.query(func.count(models.Review.id))
+        .filter(
+            models.Review.reviewee_id == pandit.id,
+            models.Review.reviewee_type == "pandit",
+        )
+        .scalar()
+        or 0
+    )
+    return {
+        "id": pandit.id,
+        "full_name": pandit.full_name,
+        "phone": pandit.phone,
+        "email": pandit.email,
+        "experience_years": pandit.experience_years,
+        "bio": pandit.bio,
+        "region": pandit.region,
+        "languages": pandit.languages,
+        "latitude": pandit.latitude,
+        "longitude": pandit.longitude,
+        "location_name": pandit.location_name,
+        "price_per_service": pandit.price_per_service,
+        "rating_avg": pandit.rating_avg,
+        "is_verified": pandit.is_verified,
+        "review_count": review_count,
+    }
 
 # List all verified pandits (no distance filter)
 @router.get("/user/pandits", response_model=list[schemas.PanditResponse])
@@ -268,7 +308,140 @@ def list_verified_pandits(
         .limit(limit)
         .all()
     )
-    return pandits
+    pandit_ids = [pandit.id for pandit in pandits]
+    review_counts = {}
+    if pandit_ids:
+        rows = (
+            db.query(models.Review.reviewee_id, func.count(models.Review.id))
+            .filter(
+                models.Review.reviewee_type == "pandit",
+                models.Review.reviewee_id.in_(pandit_ids),
+            )
+            .group_by(models.Review.reviewee_id)
+            .all()
+        )
+        review_counts = {row[0]: row[1] for row in rows}
+    return [
+        {
+            "id": pandit.id,
+            "full_name": pandit.full_name,
+            "phone": pandit.phone,
+            "email": pandit.email,
+            "experience_years": pandit.experience_years,
+            "bio": pandit.bio,
+            "region": pandit.region,
+            "languages": pandit.languages,
+            "latitude": pandit.latitude,
+            "longitude": pandit.longitude,
+            "location_name": pandit.location_name,
+            "price_per_service": pandit.price_per_service,
+            "rating_avg": pandit.rating_avg,
+            "is_verified": pandit.is_verified,
+            "review_count": review_counts.get(pandit.id, 0),
+        }
+        for pandit in pandits
+    ]
+
+@router.get("/user/pandits/paged")
+def list_verified_pandits_paged(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(12, ge=1, le=100),
+):
+    total = db.query(func.count(models.Pandit.id)).filter(models.Pandit.is_verified == True).scalar() or 0
+    pandits = (
+        db.query(models.Pandit)
+        .filter(models.Pandit.is_verified == True)
+        .order_by(models.Pandit.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    pandit_ids = [pandit.id for pandit in pandits]
+    review_counts = {}
+    if pandit_ids:
+        rows = (
+            db.query(models.Review.reviewee_id, func.count(models.Review.id))
+            .filter(
+                models.Review.reviewee_type == "pandit",
+                models.Review.reviewee_id.in_(pandit_ids),
+            )
+            .group_by(models.Review.reviewee_id)
+            .all()
+        )
+        review_counts = {row[0]: row[1] for row in rows}
+    items = [
+        {
+            "id": pandit.id,
+            "full_name": pandit.full_name,
+            "phone": pandit.phone,
+            "email": pandit.email,
+            "experience_years": pandit.experience_years,
+            "bio": pandit.bio,
+            "region": pandit.region,
+            "languages": pandit.languages,
+            "latitude": pandit.latitude,
+            "longitude": pandit.longitude,
+            "location_name": pandit.location_name,
+            "price_per_service": pandit.price_per_service,
+            "rating_avg": pandit.rating_avg,
+            "is_verified": pandit.is_verified,
+            "review_count": review_counts.get(pandit.id, 0),
+        }
+        for pandit in pandits
+    ]
+    return {
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "items": items,
+    }
+
+@router.get("/user/dashboard", response_model=schemas.UserDashboardResponse)
+def user_dashboard(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    rows = (
+        db.query(
+            models.Booking,
+            models.Service.name.label("service_name"),
+            models.Pandit.full_name.label("pandit_name"),
+        )
+        .outerjoin(models.Service, models.Service.id == models.Booking.service_id)
+        .outerjoin(models.Pandit, models.Pandit.id == models.Booking.pandit_id)
+        .filter(models.Booking.user_id == user.id)
+        .order_by(models.Booking.created_at.desc())
+        .all()
+    )
+    upcoming_count = sum(1 for booking, _, _ in rows if booking.status in ["pending", "confirmed", "scheduled"])
+    completed_count = sum(1 for booking, _, _ in rows if booking.status == "completed")
+    cancelled_count = sum(1 for booking, _, _ in rows if booking.status in ["cancelled", "rejected"])
+    total_spend = sum(booking.total_amount or 0 for booking, _, _ in rows if booking.status == "completed")
+
+    recent = rows[:5]
+    recent_items = []
+    for booking, service_name, pandit_name in recent:
+        recent_items.append({
+            "id": booking.id,
+            "booking_date": booking.booking_date,
+            "status": booking.status,
+            "total_amount": booking.total_amount,
+            "service_name": service_name,
+            "pandit_name": pandit_name,
+            "service_address": booking.service_address,
+            "service_location_name": booking.service_location_name,
+        })
+
+    return {
+        "user_name": user.full_name,
+        "upcoming_count": upcoming_count,
+        "completed_count": completed_count,
+        "cancelled_count": cancelled_count,
+        "total_spend": total_spend,
+        "recent_bookings": recent_items,
+    }
 
 # Create booking
 @router.post("/user/bookings")

@@ -135,3 +135,42 @@ def get_current_admin(authorization: str = Header(None), db: Session = Depends(g
         raise HTTPException(status_code=401, detail="Admin not found")
     
     return admin
+
+
+def get_current_user_or_pandit(authorization: str = Header(None), db: Session = Depends(get_db)):
+    """Get the current authenticated user or pandit from the JWT token in Authorization header."""
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Remove "Bearer " prefix if present
+    token = authorization
+    if token.startswith("Bearer "):
+        token = token[7:]
+    
+    payload = decode_token(token)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    user_id = payload.get("sub")
+    user_type = payload.get("type")
+    
+    if user_id is None or user_type not in ["user", "pandit"]:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    # Validate UUID format
+    try:
+        uuid.UUID(user_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(status_code=401, detail="Invalid token format")
+    
+    # Query based on user type
+    if user_type == "user":
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if user is None:
+            raise HTTPException(status_code=401, detail="User not found")
+        return user
+    else:  # pandit
+        pandit = db.query(models.Pandit).filter(models.Pandit.id == user_id).first()
+        if pandit is None:
+            raise HTTPException(status_code=401, detail="Pandit not found")
+        return pandit

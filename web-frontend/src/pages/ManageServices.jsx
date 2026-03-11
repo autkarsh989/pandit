@@ -21,12 +21,23 @@ const QUICK_SERVICES = [
 export default function ManageServices() {
   const { message, showMessage } = useFlashMessage();
   const [services, setServices] = useState([]);
+  const [serviceMeta, setServiceMeta] = useState({ skip: 0, limit: 8, total: 0 });
   const [loading, setLoading] = useState(false);
+  const [editingService, setEditingService] = useState(null);
+  const [editForm, setEditForm] = useState({
+    name: '',
+    category: '',
+    description: '',
+    basePrice: '',
+    durationMinutes: '',
+  });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [form, setForm] = useState({
     name: '',
     category: '',
     basePrice: '',
     durationMinutes: '',
+    description: '',
   });
 
   useEffect(() => {
@@ -51,17 +62,32 @@ export default function ManageServices() {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));
   };
 
-  const loadAllServices = async () => {
+  const loadAllServices = async (skipOverride = null) => {
     setLoading(true);
     try {
       const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/pandit/services`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const skipValue = skipOverride !== null ? skipOverride : serviceMeta.skip;
+      const response = await fetch(
+        `${API_BASE_URL}/pandit/services/paged?skip=${skipValue}&limit=${serviceMeta.limit}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       const data = await response.json();
-      setServices(Array.isArray(data) ? data : []);
+      const items = Array.isArray(data.items) ? data.items : [];
+      setServiceMeta({
+        total: data.total || 0,
+        skip: data.skip || 0,
+        limit: data.limit || serviceMeta.limit,
+      });
+      setServices((prev) => {
+        if (skipValue > 0) {
+          return [...prev, ...items];
+        }
+        return items;
+      });
     } catch (error) {
       showMessage('Error loading services', 'error');
       console.error('Load services error:', error);
@@ -84,8 +110,9 @@ export default function ManageServices() {
 
       if (response.ok) {
         showMessage(`Service "${payload.name}" added successfully!`, 'success');
-        setForm({ name: '', category: '', basePrice: '', durationMinutes: '' });
-        loadAllServices();
+        setForm({ name: '', category: '', basePrice: '', durationMinutes: '', description: '' });
+        setServiceMeta((prev) => ({ ...prev, skip: 0 }));
+        loadAllServices(0);
       } else {
         const error = await response.json();
         showMessage(error.detail || 'Failed to add service.', 'error');
@@ -101,6 +128,7 @@ export default function ManageServices() {
     await addService({
       name: form.name,
       category: form.category,
+      description: form.description || null,
       base_price: parseFloat(form.basePrice),
       duration_minutes: parseInt(form.durationMinutes, 10),
     });
@@ -110,14 +138,102 @@ export default function ManageServices() {
     await addService({
       name: quickService.name,
       category: quickService.category,
+      description: null,
       base_price: quickService.price,
       duration_minutes: quickService.duration,
     });
   };
 
+  const openEditModal = (service) => {
+    setEditingService(service);
+    setEditForm({
+      name: service.name || '',
+      category: service.category || '',
+      description: service.description || '',
+      basePrice: service.base_price?.toString() || '',
+      durationMinutes: service.duration_minutes?.toString() || '',
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditingService(null);
+  };
+
+  const updateService = async (event) => {
+    event.preventDefault();
+    if (!editingService) return;
+    try {
+      const token = getAuthToken();
+      const response = await fetch(`${API_BASE_URL}/pandit/services/${editingService.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: editForm.name,
+          category: editForm.category,
+          description: editForm.description || null,
+          base_price: parseFloat(editForm.basePrice),
+          duration_minutes: parseInt(editForm.durationMinutes, 10),
+        }),
+      });
+      if (response.ok) {
+        showMessage('Service updated successfully!', 'success');
+        closeEditModal();
+        setServiceMeta((prev) => ({ ...prev, skip: 0 }));
+        loadAllServices(0);
+      } else {
+        const error = await response.json();
+        showMessage(error.detail || 'Failed to update service.', 'error');
+      }
+    } catch (error) {
+      showMessage('Network error. Please try again.', 'error');
+      console.error('Update service error:', error);
+    }
+  };
+
+  const uploadServiceImage = async (serviceId, file) => {
+    if (!file) return;
+    if (!(file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.jpeg') || file.name.toLowerCase().endsWith('.png'))) {
+      showMessage('Only JPG and PNG files are allowed.', 'error');
+      return;
+    }
+    setUploadingImage(true);
+    try {
+      const token = getAuthToken();
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`${API_BASE_URL}/pandit/services/${serviceId}/image`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+      if (response.ok) {
+        const data = await response.json();
+        showMessage('Image uploaded successfully!', 'success');
+        setServices((prev) =>
+          prev.map((service) =>
+            service.id === serviceId ? { ...service, image_url: data.image_url } : service
+          )
+        );
+      } else {
+        const error = await response.json();
+        showMessage(error.detail || 'Failed to upload image.', 'error');
+      }
+    } catch (error) {
+      showMessage('Network error. Please try again.', 'error');
+      console.error('Upload image error:', error);
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
   return (
     <div className="container">
-      <div className="page-header">
+      <div className="page-header manage-services-header">
         <h2>Manage Services</h2>
         <p>Add and manage spiritual services offered on the platform</p>
       </div>
@@ -129,6 +245,7 @@ export default function ManageServices() {
       <div className="service-management">
         <div className="add-service-section">
           <h3>Add New Service</h3>
+          <p className="section-subtitle">Expand your offerings to reach more devotees.</p>
           <form onSubmit={handleAddService}>
             <div className="form-row">
               <div className="form-group">
@@ -136,7 +253,7 @@ export default function ManageServices() {
                 <input
                   type="text"
                   id="serviceName"
-                  placeholder="e.g., Griha Pravesh Puja"
+                  placeholder="e.g., Satyanarayan Puja"
                   required
                   value={form.name}
                   onChange={handleChange('name')}
@@ -163,13 +280,13 @@ export default function ManageServices() {
 
             <div className="form-row">
               <div className="form-group">
-                <label htmlFor="basePrice">Base Price (Rs) *</label>
+                <label htmlFor="basePrice">Base Price (Rs )</label>
                 <input
                   type="number"
                   id="basePrice"
                   min="0"
                   step="100"
-                  placeholder="e.g., 2100"
+                  placeholder="5100"
                   required
                   value={form.basePrice}
                   onChange={handleChange('basePrice')}
@@ -183,7 +300,7 @@ export default function ManageServices() {
                   id="durationMinutes"
                   min="15"
                   step="15"
-                  placeholder="e.g., 120"
+                  placeholder="120"
                   required
                   value={form.durationMinutes}
                   onChange={handleChange('durationMinutes')}
@@ -191,14 +308,33 @@ export default function ManageServices() {
               </div>
             </div>
 
+            <div className="form-group">
+              <label htmlFor="serviceDescription">Description</label>
+              <textarea
+                id="serviceDescription"
+                rows="3"
+                placeholder="Briefly describe the ritual and its significance..."
+                value={form.description}
+                onChange={handleChange('description')}
+              />
+            </div>
+
             <div className="form-actions">
               <button type="submit" className="btn btn-primary">
-                Add Service
+                Create Service
               </button>
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() => setForm({ name: '', category: '', basePrice: '', durationMinutes: '' })}
+                onClick={() =>
+                  setForm({
+                    name: '',
+                    category: '',
+                    basePrice: '',
+                    durationMinutes: '',
+                    description: '',
+                  })
+                }
               >
                 Clear Form
               </button>
@@ -207,8 +343,8 @@ export default function ManageServices() {
         </div>
 
         <div className="quick-add-section">
-          <h3>Quick Add - Popular Services</h3>
-          <p className="help-text">Click to quickly add common services</p>
+          <h3>Your Active Services</h3>
+          <p className="help-text">Tap to quickly add common services</p>
           <div className="quick-add-grid">
             {QUICK_SERVICES.map((service) => (
               <button
@@ -224,44 +360,161 @@ export default function ManageServices() {
         </div>
 
         <div className="existing-services-section">
-          <h3>Existing Services on Platform</h3>
-          <button type="button" onClick={loadAllServices} className="btn btn-secondary">
-            Refresh List
-          </button>
-          <div className="existing-services-list">
+          <div className="section-heading">
+            <div>
+              <h3>Your Active Services</h3>
+              <p className="section-subtitle">Manage the services you currently offer.</p>
+            </div>
+            <button type="button" onClick={loadAllServices} className="btn btn-secondary">
+              Refresh List
+            </button>
+          </div>
+          <div className="service-card-grid">
             {loading ? <p className="loading">Loading services...</p> : null}
             {!loading && services.length === 0 ? (
               <p className="no-results">No services found. Add some services above!</p>
             ) : null}
-            {!loading && services.length > 0 ? (
-              <table className="services-table">
-                <thead>
-                  <tr>
-                    <th>Service Name</th>
-                    <th>Category</th>
-                    <th>Price</th>
-                    <th>Duration</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {services.map((service) => (
-                    <tr key={service.id}>
-                      <td>
-                        <strong>{service.name}</strong>
-                      </td>
-                      <td>
-                        <span className="category-badge">{service.category}</span>
-                      </td>
-                      <td>Rs {service.base_price}</td>
-                      <td>{service.duration_minutes} min</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : null}
+            {!loading && services.length > 0
+              ? services.map((service) => (
+                  <div className="service-mini-card" key={service.id}>
+                    <div className="service-mini-icon">OM</div>
+                  <div className="service-mini-info">
+                    <h4>{service.name}</h4>
+                    <p>Category: {service.category}</p>
+                    {service.description ? (
+                      <p className="service-desc">{service.description}</p>
+                    ) : null}
+                    <div className="service-mini-meta">
+                      <span>Time {service.duration_minutes} min</span>
+                      <span>Rs {service.base_price}</span>
+                    </div>
+                    <div className="service-upload-row">
+                      <label className="upload-label">
+                        <input
+                          type="file"
+                          accept=".jpg,.jpeg,.png"
+                          onChange={(event) =>
+                            uploadServiceImage(service.id, event.target.files?.[0])
+                          }
+                          disabled={uploadingImage}
+                        />
+                        {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                      </label>
+                    </div>
+                  </div>
+                    <button type="button" className="edit-pill" onClick={() => openEditModal(service)}>
+                      Edit
+                    </button>
+                  </div>
+                ))
+              : null}
           </div>
+          {services.length < serviceMeta.total ? (
+            <div className="load-more">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  const nextSkip = serviceMeta.skip + serviceMeta.limit;
+                  loadAllServices(nextSkip);
+                }}
+              >
+                Load More Services
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
+
+      {editingService ? (
+        <div className="modal">
+          <div className="modal-content">
+            <span className="close" onClick={closeEditModal}>
+              &times;
+            </span>
+            <h3>Edit Service</h3>
+            <form onSubmit={updateService}>
+              <div className="form-group">
+                <label htmlFor="editName">Service Name</label>
+                <input
+                  id="editName"
+                  type="text"
+                  value={editForm.name}
+                  onChange={(event) => setEditForm((prev) => ({ ...prev, name: event.target.value }))}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="editCategory">Category</label>
+                <select
+                  id="editCategory"
+                  value={editForm.category}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, category: event.target.value }))
+                  }
+                  required
+                >
+                  <option value="">Select Category</option>
+                  {categories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label htmlFor="editDescription">Description</label>
+                <textarea
+                  id="editDescription"
+                  rows="3"
+                  value={editForm.description}
+                  onChange={(event) =>
+                    setEditForm((prev) => ({ ...prev, description: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="editPrice">Base Price (Rs)</label>
+                  <input
+                    id="editPrice"
+                    type="number"
+                    min="0"
+                    step="100"
+                    value={editForm.basePrice}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({ ...prev, basePrice: event.target.value }))
+                    }
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="editDuration">Duration (minutes)</label>
+                  <input
+                    id="editDuration"
+                    type="number"
+                    min="15"
+                    step="15"
+                    value={editForm.durationMinutes}
+                    onChange={(event) =>
+                      setEditForm((prev) => ({ ...prev, durationMinutes: event.target.value }))
+                    }
+                    required
+                  />
+                </div>
+              </div>
+              <div className="form-actions">
+                <button type="submit" className="btn btn-primary">
+                  Save Changes
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={closeEditModal}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

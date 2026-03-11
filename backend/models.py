@@ -63,6 +63,8 @@ class Service(Base):
     pandit_id = Column(String(36), ForeignKey("pandits.id", ondelete="CASCADE"), index=True)
     name = Column(String)
     category = Column(String)
+    description = Column(Text, nullable=True)
+    image_url = Column(String, nullable=True)
     base_price = Column(Float)
     duration_minutes = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -100,3 +102,47 @@ class Review(Base):
     rating = Column(Integer)
     comment = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class Banner(Base):
+    __tablename__ = "banners"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    title = Column(String)
+    subtitle = Column(Text)
+    badge_text = Column(String, nullable=True)
+    image_url = Column(String, nullable=True)
+    target_audience = Column(String, default="both")  # "user", "pandit", or "both"
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class SpecialOffer(Base):
+    __tablename__ = "special_offers"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    title = Column(String)
+    description = Column(Text)
+    discount_percentage = Column(Float, nullable=True)  # e.g., 20.0 for 20% off
+    discount_amount = Column(Float, nullable=True)  # e.g., 500.0 for Rs 500 off
+    offer_code = Column(String, nullable=True)  # Promo code
+    target_audience = Column(String, default="both")  # "user", "pandit", or "both"
+    effect_type = Column(String, default="badge")  # "badge", "flash", "glow", "pulse"
+    effect_color = Column(String, default="#ff6b35")  # Hex color for the effect
+    start_date = Column(DateTime, default=datetime.utcnow)
+    end_date = Column(DateTime, nullable=True)
+    is_active = Column(Boolean, default=True)
+    max_uses = Column(Integer, nullable=True)  # Maximum number of uses
+    current_uses = Column(Integer, default=0)  # Current number of uses
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class GlobalPricing(Base):
+    __tablename__ = "global_pricing"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    discount_percentage = Column(Float, default=0.0)  # Global discount percentage (e.g., 20.0 for 20% off)
+    is_active = Column(Boolean, default=False)
+    description = Column(String, nullable=True)  # Description of the pricing change
+    created_by = Column(String(36), ForeignKey("admins.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

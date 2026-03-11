@@ -1,0 +1,101 @@
+{
+  "date": "2026-03-09",
+  "panchang": {
+    "tithi": "Shashthi",
+    "nakshatra": "Jyeshtha",
+    "yoga": "Variyana",
+    "karana": "Balava",
+    "month": "Phalguna"
+  },
+  "guidance": {
+    "sunrise": "06:22 AM",
+    "sunset": "06:11 PM",
+    "sunrise_iso": "2026-03-09T06:22:16.682202+05:30",
+    "sunset_iso": "2026-03-09T18:11:52.670660+05:30",
+    "rahu_kaal": "07:50 AM - 09:19 AM",
+    "rahu_start_iso": "2026-03-09T07:50:58.680759+05:30",
+    "rahu_end_iso": "2026-03-09T09:19:40.679316+05:30",
+    "abhijit_muhurat": "12:08 PM - 12:25 PM",
+    "choghadiya": [
+      {
+        "range": "06:22 AM - 07:50 AM",
+        "start_iso": "2026-03-09T06:22:16.682202+05:30",
+        "end_iso": "2026-03-09T07:50:58.680759+05:30",
+        "type": "Udveg"
+      },
+      {
+        "range": "07:50 AM - 09:19 AM",
+        "start_iso": "2026-03-09T07:50:58.680759+05:30",
+        "end_iso": "2026-03-09T09:19:40.679316+05:30",
+        "type": "Char"
+      },
+      {
+        "range": "09:19 AM - 10:48 AM",
+        "start_iso": "2026-03-09T09:19:40.679316+05:30",
+        "end_iso": "2026-03-09T10:48:22.677874+05:30",
+        "type": "Labh"
+      },
+      {
+        "range": "10:48 AM - 12:17 PM",
+        "start_iso": "2026-03-09T10:48:22.677874+05:30",
+        "end_iso": "2026-03-09T12:17:04.676431+05:30",
+        "type": "Amrit"
+      },
+      {
+        "range": "12:17 PM - 01:45 PM",
+        "start_iso": "2026-03-09T12:17:04.676431+05:30",
+        "end_iso": "2026-03-09T13:45:46.674988+05:30",
+        "type": "Kaal"
+      },
+      {
+        "range": "01:45 PM - 03:14 PM",
+        "start_iso": "2026-03-09T13:45:46.674988+05:30",
+        "end_iso": "2026-03-09T15:14:28.673546+05:30",
+        "type": "Shubh"
+      },
+      {
+        "range": "03:14 PM - 04:43 PM",
+        "start_iso": "2026-03-09T15:14:28.673546+05:30",
+        "end_iso": "2026-03-09T16:43:10.672103+05:30",
+        "type": "Rog"
+      },
+      {
+        "range": "04:43 PM - 06:11 PM",
+        "start_iso": "2026-03-09T16:43:10.672103+05:30",
+        "end_iso": "2026-03-09T18:11:52.670660+05:30",
+        "type": "Udveg"
+      }
+    ]
+  },
+  "festivals": [
+    {
+      "festival": "Maha Shivaratri",
+      "date": "2026-03-02",
+      "start": "06:29 AM",
+      "end": "06:07 PM",
+      "tithi": "Chaturdashi",
+      "month": "Phalguna"
+    },
+    {
+      "festival": "Maha Shivaratri",
+      "date": "2026-03-17",
+      "start": "06:13 AM",
+      "end": "06:16 PM",
+      "tithi": "Chaturdashi",
+      "month": "Phalguna"
+    },
+    {
+      "festival": "Ram Navami",
+      "date": "2026-03-26",
+      "start": "06:03 AM",
+      "end": "06:20 PM",
+      "tithi": "Navami",
+      "month": "Chaitra"
+    }
+  ],
+  "location": {
+    "latitude": 26.9019,
+    "longitude": 80.913
+  },
+  "updated_on": "2026-03-09"
+}

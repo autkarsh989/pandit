@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { API_BASE_URL } from '../api/config.js';
+import { API_BASE_URL, ASSET_BASE_URL } from '../api/config.js';
 import { getAuthToken } from '../api/client.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
-import panditPortalImage from '../assets/pandit-portal.jpg';
 
 export default function PanditPortal() {
   const { panditId } = useParams();
@@ -140,12 +139,17 @@ export default function PanditPortal() {
           <div className="pandit-portal-card">
             <div className="pandit-portal-header">
               <div className="pandit-portal-avatar">
-                <img src={panditPortalImage} alt={pandit.full_name} />
+                {pandit.full_name
+                  .split(' ')
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((part) => part[0]?.toUpperCase())
+                  .join('')}
               </div>
               <div>
                 <h2>{pandit.full_name}</h2>
                 <p className="section-subtitle">
-                  {pandit.experience_years} years experience • {pandit.region}
+                  {pandit.experience_years} years experience  -  {pandit.region}
                 </p>
               </div>
               <button type="button" className="btn btn-secondary">
@@ -156,7 +160,9 @@ export default function PanditPortal() {
               <span className="rating-stars">
                 {Number.isFinite(pandit.rating_avg) ? pandit.rating_avg.toFixed(1) : 'N/A'}
               </span>
-              <span className="section-subtitle">Verified reviews</span>
+              <span className="section-subtitle">
+                {pandit.review_count ?? 0} verified reviews
+              </span>
             </div>
             <div className="pandit-portal-tags">
               {tags.map((tag) => (
@@ -205,6 +211,41 @@ export default function PanditPortal() {
         </section>
 
         <section className="section">
+          <div className="portal-section-card">
+            <div className="section-heading">
+              <div>
+                <h3>Availability</h3>
+                <p className="section-subtitle">October 2023</p>
+              </div>
+              <div className="calendar-nav">
+                <button type="button" className="icon-pill">{'<'}</button>
+                <button type="button" className="icon-pill">{'>'}</button>
+              </div>
+            </div>
+            <div className="calendar-grid">
+              {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                <div key={day} className="calendar-day">
+                  {day}
+                </div>
+              ))}
+              {Array.from({ length: 14 }).map((_, index) => (
+                <div
+                  key={`date-${index + 1}`}
+                  className={`calendar-date ${index === 5 || index === 11 ? 'active' : ''}`}
+                >
+                  {index + 1}
+                </div>
+              ))}
+            </div>
+            <div className="calendar-legend">
+              <span className="legend-item"><span className="legend-dot recommended" />Recommended</span>
+              <span className="legend-item"><span className="legend-dot available" />Available</span>
+              <span className="legend-item"><span className="legend-dot booked" />Booked</span>
+            </div>
+          </div>
+        </section>
+
+        <section className="section">
           <div className="section-heading">
             <div>
               <h2 className="section-title">Services Offered</h2>
@@ -217,11 +258,21 @@ export default function PanditPortal() {
             ) : (
               services.map((service) => (
                 <div className="service-card" key={service.id}>
-                  <div className="service-thumb portal-service-thumb" />
+                  <div
+                    className={`service-thumb portal-service-thumb ${service.image_url ? 'has-image' : ''}`}
+                    style={
+                      service.image_url
+                        ? { backgroundImage: `url(${ASSET_BASE_URL}${service.image_url})` }
+                        : undefined
+                    }
+                  />
                   <div className="service-body">
                     <div>
                       <h3>{service.name}</h3>
                       <p className="section-subtitle">{service.category}</p>
+                      {service.description ? (
+                        <p className="section-subtitle">{service.description}</p>
+                      ) : null}
                     </div>
                     <div className="service-meta">
                       <span className="tag">{service.duration_minutes} min</span>

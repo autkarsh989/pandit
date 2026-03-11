@@ -9,6 +9,7 @@ export default function Pandits() {
   const { message, showMessage } = useFlashMessage();
   const [pandits, setPandits] = useState([]);
   const [allPandits, setAllPandits] = useState([]);
+  const [allPanditMeta, setAllPanditMeta] = useState({ total: 0, skip: 0, limit: 12 });
   const [loading, setLoading] = useState(false);
   const [showDistance, setShowDistance] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
@@ -23,6 +24,12 @@ export default function Pandits() {
     minRating: 0,
     maxPrice: '',
     sortBy: 'match_score',
+  });
+  const [uiFilters, setUiFilters] = useState({
+    serviceType: 'All Pujas & Rituals',
+    language: 'All Languages',
+    priceRange: 'Any Price',
+    locationText: 'Varanasi, UP',
   });
   const [location, setLocation] = useState({
     latitude: '',
@@ -48,22 +55,37 @@ export default function Pandits() {
     navigate(`/pandits/${panditId}`);
   };
 
-  const loadAllPandits = async () => {
+  const loadAllPandits = async (skipOverride = null) => {
     try {
       const token = getAuthToken();
       if (!token) {
         return;
       }
-      const response = await fetch(`${API_BASE_URL}/user/pandits?skip=0&limit=100`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const skipValue = skipOverride !== null ? skipOverride : allPanditMeta.skip;
+      const response = await fetch(
+        `${API_BASE_URL}/user/pandits/paged?skip=${skipValue}&limit=${allPanditMeta.limit}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       if (!response.ok) {
         return;
       }
       const data = await response.json();
-      setAllPandits(Array.isArray(data) ? data : []);
+      const items = Array.isArray(data.items) ? data.items : [];
+      setAllPanditMeta({
+        total: data.total || 0,
+        skip: data.skip || 0,
+        limit: data.limit || 12,
+      });
+      setAllPandits((prev) => {
+        if (data.skip && data.skip > 0) {
+          return [...prev, ...items];
+        }
+        return items;
+      });
     } catch (error) {
       console.error('Load all pandits error:', error);
     }
@@ -246,58 +268,57 @@ export default function Pandits() {
           <div className={`message ${message.type}`}>{message.text}</div>
         ) : null}
 
-        <div className="filter-bar">
-          <div className="form-group">
-            <label htmlFor="maxDistance">Max Distance (km)</label>
-            <input
-              id="maxDistance"
-              type="number"
-              min="1"
-              value={filters.maxDistance}
-              onChange={(event) =>
-                setFilters((prev) => ({ ...prev, maxDistance: event.target.value }))
-              }
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="minRating">Min Rating</label>
-            <input
-              id="minRating"
-              type="number"
-              min="0"
-              max="5"
-              step="0.1"
-              value={filters.minRating}
-              onChange={(event) =>
-                setFilters((prev) => ({ ...prev, minRating: event.target.value }))
-              }
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="maxPrice">Max Price</label>
-            <input
-              id="maxPrice"
-              type="number"
-              min="0"
-              value={filters.maxPrice}
-              onChange={(event) =>
-                setFilters((prev) => ({ ...prev, maxPrice: event.target.value }))
-              }
-            />
-          </div>
-          <div className="form-group">
-            <label htmlFor="sortBy">Sort By</label>
+        <div className="filter-strip">
+          <div className="filter-item">
+            <label>Service Type</label>
             <select
-              id="sortBy"
-              value={filters.sortBy}
+              value={uiFilters.serviceType}
               onChange={(event) =>
-                setFilters((prev) => ({ ...prev, sortBy: event.target.value }))
+                setUiFilters((prev) => ({ ...prev, serviceType: event.target.value }))
               }
             >
-              <option value="match_score">Best Match</option>
-              <option value="distance">Distance</option>
-              <option value="price">Price</option>
-              <option value="rating">Rating</option>
+              <option>All Pujas & Rituals</option>
+              <option>Vedic Puja</option>
+              <option>Astrology</option>
+              <option>Wedding Rituals</option>
+            </select>
+          </div>
+          <div className="filter-item">
+            <label>Location</label>
+            <input
+              type="text"
+              value={uiFilters.locationText}
+              onChange={(event) =>
+                setUiFilters((prev) => ({ ...prev, locationText: event.target.value }))
+              }
+            />
+          </div>
+          <div className="filter-item">
+            <label>Language</label>
+            <select
+              value={uiFilters.language}
+              onChange={(event) =>
+                setUiFilters((prev) => ({ ...prev, language: event.target.value }))
+              }
+            >
+              <option>All Languages</option>
+              <option>Hindi</option>
+              <option>English</option>
+              <option>Sanskrit</option>
+            </select>
+          </div>
+          <div className="filter-item">
+            <label>Price Range</label>
+            <select
+              value={uiFilters.priceRange}
+              onChange={(event) =>
+                setUiFilters((prev) => ({ ...prev, priceRange: event.target.value }))
+              }
+            >
+              <option>Any Price</option>
+              <option>Under Rs 1,000</option>
+              <option>Rs 1,000 - Rs 3,000</option>
+              <option>Above Rs 3,000</option>
             </select>
           </div>
           <button type="button" onClick={loadNearbyPandits} className="btn btn-primary">
@@ -305,11 +326,11 @@ export default function Pandits() {
           </button>
         </div>
 
-        <div className="page-header" style={{ marginTop: '12px' }}>
+        <div className="page-header location-card" style={{ marginTop: '12px' }}>
           <h2>Update Location</h2>
           <p>Nearby search requires your current location</p>
         </div>
-        <div className="filter-bar">
+        <div className="filter-bar location-card">
           <div className="form-group">
             <label htmlFor="userLatitude">Latitude</label>
             <input
@@ -435,7 +456,14 @@ export default function Pandits() {
             {!loading && filteredPandits.length === 0 ? (
               <div className="no-results">
                 <p>No pandits found nearby. Adjust filters or update location.</p>
-                <button type="button" className="btn btn-secondary" onClick={loadAllPandits}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    setAllPanditMeta((prev) => ({ ...prev, skip: 0 }));
+                    loadAllPandits(0);
+                  }}
+                >
                   Show all verified pandits
                 </button>
               </div>
@@ -449,6 +477,7 @@ export default function Pandits() {
                   const languages = pandit.languages
                     ? pandit.languages.split(',').map((lang) => lang.trim())
                     : [];
+                  const reviews = pandit.review_count ?? 0;
 
                   return (
                     <div
@@ -469,7 +498,7 @@ export default function Pandits() {
                           <h3>{name}</h3>
                           <div className="rating-row">
                             <span className="rating-stars">{rating}</span>
-                            <span>rating</span>
+                            <span>({reviews} reviews)</span>
                             {pandit.experience_years ? (
                               <span>{pandit.experience_years} years experience</span>
                             ) : null}
@@ -505,13 +534,13 @@ export default function Pandits() {
                 })
               : null}
           </div>
-          {!loading && filteredPandits.length > 0 ? (
-            <div className="load-more">
-              <button type="button" className="btn btn-secondary">
-                Load More Pandits
-              </button>
-            </div>
-          ) : null}
+        {!loading && filteredPandits.length > 0 ? (
+          <div className="load-more">
+            <button type="button" className="btn btn-secondary">
+              Load More Pandits
+            </button>
+          </div>
+        ) : null}
         </section>
 
         {allPandits.length > 0 ? (
@@ -540,6 +569,7 @@ export default function Pandits() {
                 const languages = pandit.languages
                   ? pandit.languages.split(',').map((lang) => lang.trim())
                   : [];
+                const reviews = pandit.review_count ?? 0;
 
                 return (
                   <div
@@ -560,7 +590,7 @@ export default function Pandits() {
                         <h3>{name}</h3>
                         <div className="rating-row">
                           <span className="rating-stars">{rating}</span>
-                          <span>rating</span>
+                          <span>({reviews} reviews)</span>
                           {pandit.experience_years ? (
                             <span>{pandit.experience_years} years experience</span>
                           ) : null}
@@ -598,6 +628,20 @@ export default function Pandits() {
                 );
               })}
             </div>
+            {allPandits.length < allPanditMeta.total ? (
+              <div className="load-more">
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => {
+                    const nextSkip = allPanditMeta.skip + allPanditMeta.limit;
+                    loadAllPandits(nextSkip);
+                  }}
+                >
+                  Load More Pandits
+                </button>
+              </div>
+            ) : null}
           </section>
         ) : null}
       </div>

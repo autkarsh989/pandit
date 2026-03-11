@@ -1,0 +1,279 @@
+:root {
+  --ink: #11121c;
+  --paper: #f7f1e8;
+  --accent: #db6b4c;
+  --accent-dark: #a9472d;
+  --mid: #3a3d52;
+  --card: #fff8ef;
+  --shadow: 0 20px 50px rgba(16, 18, 28, 0.12);
+  font-family: "Fira Sans", "Trebuchet MS", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #fff4de 0%, #f4e4cd 45%, #efe1d5 100%);
+  color: var(--ink);
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+  display: grid;
+  gap: 32px;
+}
+
+.hero {
+  display: grid;
+  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: center;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-size: 12px;
+  color: var(--accent-dark);
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: clamp(2.5rem, 4vw, 3.4rem);
+  margin: 0 0 12px;
+}
+
+.subhead {
+  margin: 0;
+  font-size: 1.1rem;
+  color: var(--mid);
+}
+
+.hero-card {
+  background: var(--card);
+  padding: 24px;
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+}
+
+.status {
+  color: var(--mid);
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.grid .tile {
+  background: #fff;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(17, 18, 28, 0.08);
+}
+
+.panel {
+  background: #fffdf8;
+  padding: 28px;
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 20px;
+}
+
+.panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.form {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+.form-actions {
+  display: flex;
+  align-items: end;
+}
+
+label {
+  display: grid;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--mid);
+}
+
+input {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 18, 28, 0.18);
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+button {
+  background: var(--accent);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(219, 107, 76, 0.25);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--accent-dark);
+  border: 1px solid rgba(169, 71, 45, 0.4);
+}
+
+.report {
+  display: grid;
+  gap: 16px;
+}
+
+.report-raw {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.report-raw-body {
+  max-height: 420px;
+  overflow: auto;
+  background: #0f121a;
+  color: #f5f3ef;
+  padding: 16px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.report-section {
+  background: var(--card);
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px dashed rgba(17, 18, 28, 0.1);
+}
+
+.report-section h3 {
+  margin: 0 0 8px;
+}
+
+.llm-scroll {
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.llm-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.llm-scroll::-webkit-scrollbar-thumb {
+  background: rgba(17, 18, 28, 0.2);
+  border-radius: 999px;
+}
+
+.llm-report {
+  display: grid;
+  gap: 16px;
+  color: var(--mid);
+}
+
+.llm-report h4 {
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+
+.llm-hero {
+  padding: 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fff3e3, #fbe1d6);
+  color: var(--ink);
+}
+
+.llm-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.llm-card {
+  background: #ffffff;
+  border: 1px solid rgba(17, 18, 28, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.llm-card strong {
+  color: var(--ink);
+}
+
+.llm-details,
+.llm-guidance,
+.llm-footer {
+  background: #fffaf2;
+  border-radius: 14px;
+  padding: 14px;
+  border: 1px dashed rgba(17, 18, 28, 0.1);
+}
+
+.llm-details ul,
+.llm-guidance ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.llm-footer {
+  font-size: 0.95rem;
+}
+
+.report-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 16px;
+  color: var(--mid);
+}
+
+.festival-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.festival-card {
+  background: #fff;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(17, 18, 28, 0.1);
+}
+
+.festival-card h4 {
+  margin: 0 0 8px;
+}
+
+@media (max-width: 720px) {
+  .panel-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

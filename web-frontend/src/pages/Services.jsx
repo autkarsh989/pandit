@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { API_BASE_URL } from '../api/config.js';
+import { API_BASE_URL, ASSET_BASE_URL } from '../api/config.js';
 import { getAuthToken } from '../api/client.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
@@ -8,6 +8,7 @@ export default function Services() {
   const navigate = useNavigate();
   const { message, showMessage } = useFlashMessage();
   const [services, setServices] = useState([]);
+  const [serviceMeta, setServiceMeta] = useState({ skip: 0, limit: 12, total: 0 });
   const [keyword, setKeyword] = useState('');
   const [sortBy, setSortBy] = useState('price_asc');
   const [loading, setLoading] = useState(true);
@@ -20,17 +21,27 @@ export default function Services() {
     loadServices();
   }, []);
 
-  const loadServices = async () => {
+  const loadServices = async (skipOverride = null) => {
     setLoading(true);
     try {
       const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/user/services?skip=0&limit=100`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const skipValue = skipOverride !== null ? skipOverride : serviceMeta.skip;
+      const response = await fetch(
+        `${API_BASE_URL}/user/services?skip=${skipValue}&limit=${serviceMeta.limit}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       const data = await response.json();
-      setServices(Array.isArray(data) ? data : []);
+      const list = Array.isArray(data) ? data : [];
+      setServices((prev) => {
+        if (skipValue > 0) {
+          return [...prev, ...list];
+        }
+        return list;
+      });
     } catch (error) {
       showMessage('Error loading services', 'error');
       console.error('Load services error:', error);
@@ -55,6 +66,7 @@ export default function Services() {
       });
       const data = await response.json();
       setServices(Array.isArray(data.items) ? data.items : data);
+      setServiceMeta((prev) => ({ ...prev, skip: 0 }));
     } catch (error) {
       showMessage('Error searching services', 'error');
       console.error('Search services error:', error);
@@ -214,8 +226,15 @@ export default function Services() {
             ) : null}
             {!loading
               ? filteredServices.map((service) => (
-                  <div className="service-card" key={service.id}>
-                    <div className="service-thumb" />
+                <div className="service-card" key={service.id}>
+                  <div
+                    className={`service-thumb ${service.image_url ? 'has-image' : ''}`}
+                    style={
+                      service.image_url
+                        ? { backgroundImage: `url(${ASSET_BASE_URL}${service.image_url})` }
+                        : undefined
+                    }
+                  />
                     <div className="service-body">
                       <div>
                         <h3>{service.name}</h3>
@@ -227,6 +246,9 @@ export default function Services() {
                         <span className="tag">{service.category}</span>
                         <span className="tag">{service.duration_minutes} min</span>
                       </div>
+                      {service.description ? (
+                        <p className="section-subtitle">{service.description}</p>
+                      ) : null}
                       <div className="service-footer">
                         <span className="service-price">Starting at Rs {service.base_price}</span>
                         <button
@@ -242,6 +264,21 @@ export default function Services() {
                 ))
               : null}
           </div>
+          {services.length >= serviceMeta.limit ? (
+            <div className="load-more">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  const nextSkip = serviceMeta.skip + serviceMeta.limit;
+                  setServiceMeta((prev) => ({ ...prev, skip: nextSkip }));
+                  loadServices(nextSkip);
+                }}
+              >
+                Load More Services
+              </button>
+            </div>
+          ) : null}
         </section>
       </div>
 

@@ -1,0 +1,31 @@
+{
+  "month": 3,
+  "year": 2026,
+  "updated_on": "2026-03-09",
+  "festivals": [
+    {
+      "festival": "Maha Shivaratri",
+      "date": "2026-03-02",
+      "start": "06:29 AM",
+      "end": "06:07 PM",
+      "tithi": "Chaturdashi",
+      "month": "Phalguna"
+    },
+    {
+      "festival": "Maha Shivaratri",
+      "date": "2026-03-17",
+      "start": "06:13 AM",
+      "end": "06:16 PM",
+      "tithi": "Chaturdashi",
+      "month": "Phalguna"
+    },
+    {
+      "festival": "Ram Navami",
+      "date": "2026-03-26",
+      "start": "06:03 AM",
+      "end": "06:20 PM",
+      "tithi": "Navami",
+      "month": "Chaitra"
+    }
+  ]
+}

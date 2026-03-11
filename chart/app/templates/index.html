@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Astro Daily Report</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Auto-updating Panchang + Kundali</p>
+          <h1>Daily Astro Intelligence</h1>
+          <p class="subhead">
+            Generate your personalized report with Kundali, Mulank, Panchang, time guidance, and
+            monthly festivals — updated automatically every day.
+          </p>
+        </div>
+        <div class="hero-card">
+          <h2>Today Snapshot</h2>
+          <div id="today-status" class="status">Loading daily cache...</div>
+          <div id="today-data" class="grid"></div>
+        </div>
+      </header>
+
+      <section class="panel">
+        <h2>Get Your Personalized Report</h2>
+        <form id="report-form" class="form">
+          <label>
+            Date of Birth
+            <input type="date" name="dob" required />
+          </label>
+          <label>
+            Time of Birth
+            <input type="time" name="tob" required />
+          </label>
+          <label>
+            Latitude
+            <input type="number" id="latitude" name="latitude" step="0.0001" required />
+          </label>
+          <label>
+            Longitude
+            <input type="number" id="longitude" name="longitude" step="0.0001" required />
+          </label>
+          <div class="form-actions">
+            <button type="button" id="gps-btn" class="ghost">Use Current Location</button>
+          </div>
+          <button type="submit">Generate Report</button>
+        </form>
+        <div id="report-output" class="report"></div>
+        <div class="report-raw">
+          <h3>Full Generated Data</h3>
+          <pre id="report-raw" class="report-raw-body">Waiting for report...</pre>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Festivals This Month</h2>
+          <button id="refresh-btn" class="ghost">Refresh Cache</button>
+        </div>
+        <div id="festival-output" class="festival-grid"></div>
+      </section>
+    </main>
+
+    <script src="/static/app.js?v=2"></script>
+  </body>
+</html>

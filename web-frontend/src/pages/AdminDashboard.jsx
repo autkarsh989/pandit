@@ -167,7 +167,7 @@ export default function AdminDashboard() {
                       <h3>{pandit.full_name || pandit.name || 'Pandit Profile'}</h3>
                       <div className="rating-row">
                         <span>{pandit.region || 'Region not provided'}</span>
-                        <span>•</span>
+                        <span> - </span>
                         <span>{pandit.languages || 'Languages not set'}</span>
                       </div>
                     </div>

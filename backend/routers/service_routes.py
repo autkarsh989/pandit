@@ -58,7 +58,8 @@ def search_services(
         query = query.filter(
             or_(
                 models.Service.name.ilike(f"%{keyword_lower}%"),
-                models.Service.category.ilike(f"%{keyword_lower}%")
+                models.Service.category.ilike(f"%{keyword_lower}%"),
+                models.Service.description.ilike(f"%{keyword_lower}%")
             )
         )
     
@@ -242,7 +243,7 @@ def search_services_by_distance(
         "items": paginated
     }
 @router.put("/services/{service_id}")
-def update_service(service_id: str, service_data: schemas.ServiceCreate, db: Session = Depends(get_db), user=Depends(get_current_user)):
+def update_service(service_id: str, service_data: schemas.ServiceUpdate, db: Session = Depends(get_db), user=Depends(get_current_user)):
     from fastapi import HTTPException
     
     # Get the service
@@ -256,10 +257,18 @@ def update_service(service_id: str, service_data: schemas.ServiceCreate, db: Ses
         raise HTTPException(status_code=403, detail="You can only edit your own services")
     
     # Update service
-    service.name = service_data.name
-    service.category = service_data.category
-    service.base_price = service_data.base_price
-    service.duration_minutes = service_data.duration_minutes
+    if service_data.name is not None:
+        service.name = service_data.name
+    if service_data.category is not None:
+        service.category = service_data.category
+    if service_data.description is not None:
+        service.description = service_data.description
+    if service_data.image_url is not None:
+        service.image_url = service_data.image_url
+    if service_data.base_price is not None:
+        service.base_price = service_data.base_price
+    if service_data.duration_minutes is not None:
+        service.duration_minutes = service_data.duration_minutes
     
     db.commit()
     return {"msg": "Service updated", "service_id": str(service.id)}

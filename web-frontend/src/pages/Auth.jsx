@@ -169,71 +169,97 @@ export default function Auth() {
   };
 
   return (
-    <div className="container">
-      <div className="auth-container">
-        <h1>Pandit Booking System</h1>
-        <p className="subtitle">Connect with experienced pandits for your spiritual needs</p>
-
-        <div className="filter-section" style={{ marginBottom: '20px' }}>
+    <div className="auth-page">
+      <header className="auth-topbar">
+        <div className="auth-brand">
+          <div className="auth-logo">OM</div>
           <div>
-            <p className="section-title">Choose account type</p>
-            <p className="section-subtitle">Pick the one that fits your needs. You can switch later.</p>
-          </div>
-          <div className="button-group">
-            <button
-              type="button"
-              className={`btn ${accountType === 'user' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setAccountType('user')}
-            >
-              User Login
-            </button>
-            <button
-              type="button"
-              className={`btn ${accountType === 'pandit' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setAccountType('pandit')}
-            >
-              Pandit Login
-            </button>
+            <p className="auth-brand-title">PANDIT</p>
+            <p className="auth-brand-subtitle">Spiritual Services</p>
           </div>
         </div>
+        <div className="auth-topbar-actions">
+          <button type="button" className="icon-pill">?</button>
+          <button type="button" className="lang-pill">English</button>
+        </div>
+      </header>
+
+      <div className="auth-shell">
+        <div className="auth-card">
+          <div className="auth-card-header">
+            <div className="auth-user-icon">U</div>
+            <div className="auth-tabs">
+              <button
+                type="button"
+                className={`auth-tab ${accountType === 'user' ? 'active' : ''}`}
+                onClick={() => setAccountType('user')}
+              >
+                User Login
+              </button>
+              <button
+                type="button"
+                className={`auth-tab ${accountType === 'pandit' ? 'active' : ''}`}
+                onClick={() => setAccountType('pandit')}
+              >
+                Pandit Login
+              </button>
+            </div>
+          </div>
+
+          <div className="auth-body">
+            <h2 className="auth-title">{formType === 'login' ? 'Sign In' : 'Register'}</h2>
+            <p className="auth-subtitle">
+              {formType === 'login'
+                ? 'Access your spiritual account'
+                : 'Create your spiritual account'}
+            </p>
 
         <div className={`auth-form ${formType === 'login' ? '' : 'hidden'}`}>
-          <h2>{accountType === 'pandit' ? 'Pandit Login' : 'User Login'}</h2>
           <form onSubmit={handleLogin}>
             <div className="form-group">
               <label htmlFor="loginPhone">Phone Number</label>
-              <input
-                type="tel"
-                id="loginPhone"
-                placeholder="Enter your phone number"
-                required
-                value={loginForm.phone}
-                onChange={(event) =>
-                  setLoginForm((prev) => ({ ...prev, phone: event.target.value }))
-                }
-              />
+              <div className="input-pill">
+                <span className="input-icon">P</span>
+                <input
+                  type="tel"
+                  id="loginPhone"
+                  placeholder="Enter your mobile number"
+                  required
+                  value={loginForm.phone}
+                  onChange={(event) =>
+                    setLoginForm((prev) => ({ ...prev, phone: event.target.value }))
+                  }
+                />
+              </div>
             </div>
             <div className="form-group">
-              <label htmlFor="loginPassword">Password</label>
-              <input
-                type="password"
-                id="loginPassword"
-                placeholder="Enter your password"
-                required
-                value={loginForm.password}
-                onChange={(event) =>
-                  setLoginForm((prev) => ({ ...prev, password: event.target.value }))
-                }
-              />
+              <div className="form-label-row">
+                <label htmlFor="loginPassword">Password</label>
+                <button type="button" className="link-button">Forgot?</button>
+              </div>
+              <div className="input-pill">
+                <span className="input-icon">L</span>
+                <input
+                  type="password"
+                  id="loginPassword"
+                  placeholder="Enter your password"
+                  required
+                  value={loginForm.password}
+                  onChange={(event) =>
+                    setLoginForm((prev) => ({ ...prev, password: event.target.value }))
+                  }
+                />
+                <span className="input-icon">E</span>
+              </div>
             </div>
-            <button type="submit" className="btn btn-primary">
-              Login
+            <button type="submit" className="btn btn-primary full-width">
+              Sign In ->
             </button>
           </form>
-          <p className="toggle-auth">
+          <p className="toggle-auth center-text">
             Don&apos;t have an account?{' '}
-            <button type="button" onClick={() => toggleForm('register')}>
-              Register
+            <button type="button" onClick={() => toggleForm('register')} className="link-button">
+              Register Now
             </button>
           </p>
         </div>
@@ -455,9 +481,9 @@ export default function Auth() {
               </form>
             </>
           )}
-          <p className="toggle-auth">
+          <p className="toggle-auth center-text">
             Already have an account?{' '}
-            <button type="button" onClick={() => toggleForm('login')}>
+            <button type="button" onClick={() => toggleForm('login')} className="link-button">
               Login
             </button>
           </p>
@@ -466,6 +492,12 @@ export default function Auth() {
         {message.text ? (
           <div className={`message ${message.type}`}>{message.text}</div>
         ) : null}
+          </div>
+          <div className="auth-footer">
+            <span>Secure Payment</span>
+            <span>Verified Pandits</span>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -25,6 +25,12 @@ export default function Bookings() {
     loadBookings();
   }, []);
 
+  useEffect(() => {
+    if (isPandit) {
+      setActiveTab('pending');
+    }
+  }, [isPandit]);
+
   const loadBookings = async () => {
     const token = getAuthToken();
     if (!token) {
@@ -73,7 +79,10 @@ export default function Bookings() {
     setBookingDetail(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/user/bookings/${bookingId}`, {
+      const endpoint = isPandit
+        ? `${API_BASE_URL}/pandit/bookings/${bookingId}`
+        : `${API_BASE_URL}/user/bookings/${bookingId}`;
+      const response = await fetch(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (response.ok) {
@@ -149,13 +158,16 @@ export default function Bookings() {
       upcoming: ['pending', 'confirmed', 'scheduled'],
       completed: ['completed'],
       cancelled: ['cancelled', 'rejected'],
+      pending: ['pending'],
+      confirmed: ['confirmed'],
     }),
     []
   );
 
   const filteredBookings = useMemo(() => {
     if (isPandit) {
-      return bookings;
+      const group = statusGroups[activeTab] || [];
+      return bookings.filter((booking) => group.includes(booking.status));
     }
     const group = statusGroups[activeTab] || [];
     return bookings.filter((booking) => group.includes(booking.status));
@@ -172,34 +184,60 @@ export default function Bookings() {
 
   return (
     <div className="container">
-      <div className="page-header">
+      <div className="page-header booking-header">
         <h2>{isPandit ? 'Booking Requests' : 'My Bookings'}</h2>
         <p>{isPandit ? 'Manage requests for your services' : 'View and manage your bookings'}</p>
-        {!isPandit ? (
-          <div className="tabs" style={{ marginTop: '18px' }}>
-            <button
-              type="button"
-              className={`tab-button ${activeTab === 'upcoming' ? 'active' : ''}`}
-              onClick={() => setActiveTab('upcoming')}
-            >
-              Upcoming ({tabCounts.upcoming})
-            </button>
-            <button
-              type="button"
-              className={`tab-button ${activeTab === 'completed' ? 'active' : ''}`}
-              onClick={() => setActiveTab('completed')}
-            >
-              Completed ({tabCounts.completed})
-            </button>
-            <button
-              type="button"
-              className={`tab-button ${activeTab === 'cancelled' ? 'active' : ''}`}
-              onClick={() => setActiveTab('cancelled')}
-            >
-              Cancelled ({tabCounts.cancelled})
-            </button>
-          </div>
-        ) : null}
+        <div className="tabs" style={{ marginTop: '18px' }}>
+          {isPandit ? (
+            <>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'pending' ? 'active' : ''}`}
+                onClick={() => setActiveTab('pending')}
+              >
+                Pending ({bookings.filter((b) => b.status === 'pending').length})
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'confirmed' ? 'active' : ''}`}
+                onClick={() => setActiveTab('confirmed')}
+              >
+                Confirmed ({bookings.filter((b) => b.status === 'confirmed').length})
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'completed' ? 'active' : ''}`}
+                onClick={() => setActiveTab('completed')}
+              >
+                Completed ({bookings.filter((b) => b.status === 'completed').length})
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'upcoming' ? 'active' : ''}`}
+                onClick={() => setActiveTab('upcoming')}
+              >
+                Upcoming ({tabCounts.upcoming})
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'completed' ? 'active' : ''}`}
+                onClick={() => setActiveTab('completed')}
+              >
+                Completed ({tabCounts.completed})
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${activeTab === 'cancelled' ? 'active' : ''}`}
+                onClick={() => setActiveTab('cancelled')}
+              >
+                Cancelled ({tabCounts.cancelled})
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {message.text ? (
@@ -226,18 +264,24 @@ export default function Bookings() {
           ? filteredBookings.map((booking) => (
               <div className="booking-card" key={booking.id}>
                 <div className="booking-left">
-                  <div className="booking-avatar">P</div>
+                  <div className="booking-avatar">OM</div>
                   <div className="booking-info">
+                    <div className="booking-status-row">
+                      <span className={`status-badge status-${booking.status}`}>
+                        {booking.status}
+                      </span>
+                      <span className="booking-id">Order ID: #{booking.id.substring(0, 8)}</span>
+                    </div>
                     <h3>{booking.service_name || `Booking #${booking.id.substring(0, 8)}`}</h3>
-                    <p>{new Date(booking.booking_date).toLocaleString()}</p>
-                    <p>Amount: Rs {booking.total_amount}</p>
+                    <p>{booking.pandit_name || booking.user_name || 'Pandit'}</p>
+                    <div className="booking-meta">
+                      <span>{new Date(booking.booking_date).toLocaleDateString()}</span>
+                      <span>{new Date(booking.booking_date).toLocaleTimeString()}</span>
+                    </div>
                   </div>
                 </div>
                 <div>
-                  <span className={`status-badge status-${booking.status}`}>
-                    {booking.status}
-                  </span>
-                  <div className="booking-actions" style={{ marginTop: '10px' }}>
+                  <div className="booking-actions">
                     {!isPandit && booking.status === 'completed' && !booking.reviewed_by_user ? (
                       <button
                         type="button"
@@ -272,7 +316,7 @@ export default function Bookings() {
                                 }
                               }}
                             >
-                              Confirm
+                              Accept
                             </button>
                             <button
                               type="button"
@@ -295,7 +339,7 @@ export default function Bookings() {
                                 }
                               }}
                             >
-                              Reject
+                              Decline
                             </button>
                           </>
                         ) : null}
@@ -333,6 +377,13 @@ export default function Bookings() {
                             Rate User
                           </button>
                         ) : null}
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => openDetailModal(booking.id)}
+                        >
+                          View Details
+                        </button>
                       </>
                     ) : (
                       <button
@@ -419,8 +470,10 @@ export default function Bookings() {
                 {bookingDetail.service_name || `Service #${bookingDetail.service_id.slice(0, 8)}`}
               </p>
               <p>
-                <strong>Pandit:</strong>{' '}
-                {bookingDetail.pandit_name || `Pandit #${bookingDetail.pandit_id.slice(0, 8)}`}
+                <strong>{isPandit ? 'User' : 'Pandit'}:</strong>{' '}
+                {isPandit
+                  ? bookingDetail.user_name || `User #${bookingDetail.user_id.slice(0, 8)}`
+                  : bookingDetail.pandit_name || `Pandit #${bookingDetail.pandit_id.slice(0, 8)}`}
               </p>
               <p>
                 <strong>Date:</strong> {new Date(bookingDetail.booking_date).toLocaleDateString()}

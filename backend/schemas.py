@@ -83,6 +83,7 @@ class PanditResponse(BaseModel):
     price_per_service: float
     rating_avg: float
     is_verified: bool
+    review_count: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -105,6 +106,7 @@ class PanditWithDistance(BaseModel):
     is_verified: bool
     distance_km: float
     match_score: float
+    review_count: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -112,14 +114,26 @@ class PanditWithDistance(BaseModel):
 class ServiceCreate(BaseModel):
     name: str
     category: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
     base_price: float = Field(..., gt=0, description="Base price (must be > 0)")
     duration_minutes: int = Field(..., gt=0, description="Duration in minutes (must be > 0)")
+
+class ServiceUpdate(BaseModel):
+    name: Optional[str] = None
+    category: Optional[str] = None
+    description: Optional[str] = None
+    image_url: Optional[str] = None
+    base_price: Optional[float] = Field(default=None, gt=0)
+    duration_minutes: Optional[int] = Field(default=None, gt=0)
 
 class ServiceResponse(BaseModel):
     id: str
     pandit_id: str
     name: str
     category: str
+    description: Optional[str] = None
+    image_url: Optional[str] = None
     base_price: float
     duration_minutes: int
 
@@ -173,6 +187,135 @@ class ReviewResponse(BaseModel):
     reviewee_type: str
     rating: int
     comment: str
+
+    class Config:
+        from_attributes = True
+
+class DashboardBookingItem(BaseModel):
+    id: str
+    booking_date: str
+    status: str
+    total_amount: float
+    service_name: Optional[str] = None
+    user_name: Optional[str] = None
+    pandit_name: Optional[str] = None
+    service_address: Optional[str] = None
+    service_location_name: Optional[str] = None
+
+class PanditDashboardResponse(BaseModel):
+    pandit_name: Optional[str] = None
+    rating_avg: Optional[float] = None
+    review_count: int
+    active_services: int
+    pending_requests: int
+    total_earnings: float
+    upcoming_bookings: list[DashboardBookingItem]
+    recent_requests: list[DashboardBookingItem]
+
+class UserDashboardResponse(BaseModel):
+    user_name: Optional[str] = None
+    upcoming_count: int
+    completed_count: int
+    cancelled_count: int
+    total_spend: float
+    recent_bookings: list[DashboardBookingItem]
+
+# Banner Schemas
+class BannerCreate(BaseModel):
+    title: str
+    subtitle: str
+    badge_text: Optional[str] = None
+    target_audience: str = Field(default="both", pattern="^(user|pandit|both)$")
+    is_active: bool = True
+
+class BannerUpdate(BaseModel):
+    title: Optional[str] = None
+    subtitle: Optional[str] = None
+    badge_text: Optional[str] = None
+    target_audience: Optional[str] = Field(default=None, pattern="^(user|pandit|both)$")
+    is_active: Optional[bool] = None
+
+class BannerResponse(BaseModel):
+    id: str
+    title: str
+    subtitle: str
+    badge_text: Optional[str]
+    image_url: Optional[str]
+    target_audience: str
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Special Offer Schemas
+class SpecialOfferCreate(BaseModel):
+    title: str
+    description: str
+    discount_percentage: Optional[float] = Field(default=None, ge=0, le=100)
+    discount_amount: Optional[float] = Field(default=None, ge=0)
+    offer_code: Optional[str] = None
+    target_audience: str = Field(default="both", pattern="^(user|pandit|both)$")
+    effect_type: str = Field(default="badge", pattern="^(badge|flash|glow|pulse)$")
+    effect_color: str = Field(default="#ff6b35", pattern="^#[0-9a-fA-F]{6}$")
+    end_date: Optional[datetime] = None
+    max_uses: Optional[int] = Field(default=None, ge=1)
+    is_active: bool = True
+
+class SpecialOfferUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    discount_percentage: Optional[float] = Field(default=None, ge=0, le=100)
+    discount_amount: Optional[float] = Field(default=None, ge=0)
+    offer_code: Optional[str] = None
+    target_audience: Optional[str] = Field(default=None, pattern="^(user|pandit|both)$")
+    effect_type: Optional[str] = Field(default=None, pattern="^(badge|flash|glow|pulse)$")
+    effect_color: Optional[str] = Field(default=None, pattern="^#[0-9a-fA-F]{6}$")
+    end_date: Optional[datetime] = None
+    max_uses: Optional[int] = Field(default=None, ge=1)
+    is_active: Optional[bool] = None
+
+class SpecialOfferResponse(BaseModel):
+    id: str
+    title: str
+    description: str
+    discount_percentage: Optional[float]
+    discount_amount: Optional[float]
+    offer_code: Optional[str]
+    target_audience: str
+    effect_type: str
+    effect_color: str
+    start_date: datetime
+    end_date: Optional[datetime]
+    is_active: bool
+    max_uses: Optional[int]
+    current_uses: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# Global Pricing Schemas
+class GlobalPricingCreate(BaseModel):
+    discount_percentage: float = Field(..., ge=0, le=100, description="Discount percentage (0-100)")
+    description: Optional[str] = None
+    is_active: bool = True
+
+class GlobalPricingUpdate(BaseModel):
+    discount_percentage: Optional[float] = Field(default=None, ge=0, le=100)
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class GlobalPricingResponse(BaseModel):
+    id: str
+    discount_percentage: float
+    is_active: bool
+    description: Optional[str]
+    created_by: Optional[str]
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True

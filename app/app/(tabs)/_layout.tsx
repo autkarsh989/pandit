@@ -44,6 +44,14 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="horoscope"
+        options={{
+          title: 'Horoscope',
+          tabBarIcon: ({ color }) => <TabIcon name="moon-o" color={color} />,
+          href: isPandit ? null : '/(tabs)/horoscope',
+        }}
+      />
+      <Tabs.Screen
         name="services"
         options={{
           title: 'Services',

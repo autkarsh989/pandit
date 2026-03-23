@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 
 # User Schemas
 class UserCreate(BaseModel):
@@ -8,6 +8,9 @@ class UserCreate(BaseModel):
     phone: str
     password: str
     email: Optional[str] = None
+    dob: Optional[date] = None
+    time_of_birth: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    place_of_birth: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     location_name: Optional[str] = None
@@ -16,11 +19,20 @@ class UserLogin(BaseModel):
     phone: str
     password: str
 
+
+class UserDobUpdate(BaseModel):
+    dob: Optional[date] = None
+    time_of_birth: Optional[str] = Field(default=None, pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    place_of_birth: Optional[str] = None
+
 class UserResponse(BaseModel):
     id: str
     full_name: str
     phone: str
     email: Optional[str]
+    dob: Optional[date]
+    time_of_birth: Optional[str]
+    place_of_birth: Optional[str]
     profile_picture: Optional[str]
     latitude: Optional[float]
     longitude: Optional[float]

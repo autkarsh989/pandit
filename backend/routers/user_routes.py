@@ -14,6 +14,26 @@ router = APIRouter()
 def get_profile(user=Depends(get_current_user)):
     return user
 
+
+@router.put("/user/profile/dob")
+def update_user_dob(
+    payload: schemas.UserDobUpdate,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+    """Add or update birth details for the logged-in user; pass null to clear values."""
+    user.dob = payload.dob
+    user.time_of_birth = payload.time_of_birth
+    user.place_of_birth = payload.place_of_birth
+    db.commit()
+    db.refresh(user)
+    return {
+        "msg": "Birth details updated successfully",
+        "dob": user.dob,
+        "time_of_birth": user.time_of_birth,
+        "place_of_birth": user.place_of_birth,
+    }
+
 # Upload/Update user profile picture
 @router.post("/user/profile/picture")
 def upload_profile_picture(

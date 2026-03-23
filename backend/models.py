@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, DateTime, Float, Text, UniqueConstraint
+from sqlalchemy import Column, String, Integer, Boolean, ForeignKey, DateTime, Float, Text, UniqueConstraint, Date
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
@@ -15,6 +15,9 @@ class User(Base):
     full_name = Column(String)
     phone = Column(String, unique=True)
     email = Column(String, nullable=True)
+    dob = Column(Date, nullable=True)
+    time_of_birth = Column(String(5), nullable=True)
+    place_of_birth = Column(String, nullable=True)
     hashed_password = Column(String)
     profile_picture = Column(String, nullable=True)
     latitude = Column(Float, nullable=True)

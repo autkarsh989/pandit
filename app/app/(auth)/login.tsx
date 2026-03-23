@@ -21,6 +21,7 @@ export default function LoginScreen() {
     password: '',
     location: '',
     email: '',
+    dob: '',
   });
   const [panditForm, setPanditForm] = useState({
     fullName: '',
@@ -78,6 +79,7 @@ export default function LoginScreen() {
           phone: registerForm.phone,
           password: registerForm.password,
           email: registerForm.email || null,
+          dob: registerForm.dob || null,
           location_name: registerForm.location || null,
         }),
       });
@@ -206,6 +208,11 @@ export default function LoginScreen() {
                   value={registerForm.email}
                   onChangeText={(text) => setRegisterForm((prev) => ({ ...prev, email: text }))}
                   keyboardType="email-address"
+                />
+                <AppTextInput
+                  label="Date of Birth (Optional, YYYY-MM-DD)"
+                  value={registerForm.dob}
+                  onChangeText={(text) => setRegisterForm((prev) => ({ ...prev, dob: text }))}
                 />
                 <AppTextInput
                   label="Location (Optional)"

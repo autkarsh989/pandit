@@ -3,6 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect, text
 from database import Base, engine
 from routers import auth_routes, pandit_routes, user_routes, admin_routes , horoscope_routes
 import os
@@ -32,6 +33,27 @@ os.makedirs(config.PROFILE_PICTURES_DIR, exist_ok=True)
 
 # Create tables on startup
 Base.metadata.create_all(bind=engine)
+
+
+def run_startup_migrations() -> None:
+    """Apply lightweight schema patches for existing DBs without Alembic."""
+    inspector = inspect(engine)
+    existing_columns = {col["name"] for col in inspector.get_columns("users")}
+
+    if "dob" not in existing_columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN dob DATE"))
+
+    if "time_of_birth" not in existing_columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN time_of_birth VARCHAR(5)"))
+
+    if "place_of_birth" not in existing_columns:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE users ADD COLUMN place_of_birth VARCHAR"))
+
+
+run_startup_migrations()
 
 # Mount static files for serving uploaded images
 app.mount("/uploads", StaticFiles(directory=config.UPLOAD_DIR), name="uploads")

@@ -54,6 +54,7 @@ export default function ManageServicesScreen() {
     basePrice: '',
     durationMinutes: '',
     description: '',
+    imageUri: '',
   });
   const [editForm, setEditForm] = useState(form);
 
@@ -103,8 +104,24 @@ export default function ManageServicesScreen() {
   const addService = async (payload: any) => {
     if (!token) return;
     try {
-      await apiPost('/pandit/services', payload, token);
-      setForm({ name: '', category: '', basePrice: '', durationMinutes: '', description: '' });
+      const formData = new FormData();
+      formData.append('name', payload.name);
+      formData.append('category', payload.category);
+      formData.append('base_price', String(payload.base_price));
+      formData.append('duration_minutes', String(payload.duration_minutes));
+      if (payload.description) {
+        formData.append('description', payload.description);
+      }
+      if (payload.imageUri) {
+        formData.append('file', {
+          uri: payload.imageUri,
+          type: 'image/jpeg',
+          name: 'service-create.jpg',
+        } as any);
+      }
+
+      await apiPost('/pandit/services', formData, token);
+      setForm({ name: '', category: '', basePrice: '', durationMinutes: '', description: '', imageUri: '' });
       setServiceMeta(prev => ({ ...prev, skip: 0 }));
       loadServices(0);
     } catch (error) {
@@ -125,7 +142,25 @@ export default function ManageServicesScreen() {
       description: form.description || null,
       base_price: parseFloat(form.basePrice),
       duration_minutes: parseInt(form.durationMinutes, 10),
+      imageUri: form.imageUri || null,
     });
+  };
+
+  const pickCreateImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 9],
+        quality: 0.8,
+      });
+
+      if (result.canceled) return;
+      setForm((prev) => ({ ...prev, imageUri: result.assets[0].uri }));
+    } catch (error) {
+      console.error('Pick create image error', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
   };
 
   const openEdit = (service: Service) => {
@@ -259,6 +294,22 @@ export default function ManageServicesScreen() {
           onChangeText={(text) => setForm((prev) => ({ ...prev, description: text }))}
           multiline
         />
+        <View style={styles.createImageRow}>
+          <TouchableOpacity style={styles.uploadButton} onPress={pickCreateImage}>
+            <Text style={styles.uploadButtonText}>{form.imageUri ? 'Change Image' : 'Add Image (Optional)'}</Text>
+          </TouchableOpacity>
+          {form.imageUri ? (
+            <TouchableOpacity
+              style={styles.clearImageButton}
+              onPress={() => setForm((prev) => ({ ...prev, imageUri: '' }))}
+            >
+              <Text style={styles.clearImageButtonText}>Remove</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {form.imageUri ? (
+          <Image source={{ uri: form.imageUri }} style={styles.createImagePreview} />
+        ) : null}
         <AppButton title="Create Service" onPress={handleAdd} />
       </Card>
 
@@ -438,6 +489,29 @@ const styles = StyleSheet.create({
   textArea: {
     height: 90,
     textAlignVertical: 'top',
+  },
+  createImageRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'center',
+  },
+  clearImageButton: {
+    borderWidth: 1,
+    borderColor: colors.border200,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#fff',
+  },
+  clearImageButtonText: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 11,
+    color: colors.ink700,
+  },
+  createImagePreview: {
+    width: '100%',
+    height: 140,
+    borderRadius: radius.md,
   },
   quickGrid: {
     flexDirection: 'row',

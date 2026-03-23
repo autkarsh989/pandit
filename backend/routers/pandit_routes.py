@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import Optional
@@ -118,24 +118,60 @@ def update_location(
 # Add a new service
 @router.post("/pandit/services")
 def add_service(
-    service: schemas.ServiceCreate,
+    name: str = Form(...),
+    category: str = Form(...),
+    base_price: float = Form(...),
+    duration_minutes: int = Form(...),
+    description: Optional[str] = Form(None),
+    file: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
     pandit=Depends(get_current_pandit)
 ):
-    """Add a new service with pricing"""
+    """Add a new service with optional image upload."""
+    image_url = None
+
+    if file and file.filename:
+        filename = file.filename
+        lower = filename.lower()
+        if not (lower.endswith(".jpg") or lower.endswith(".jpeg") or lower.endswith(".png") or lower.endswith(".webp")):
+            raise HTTPException(status_code=400, detail="Only JPG, JPEG, PNG, and WEBP images are allowed")
+
+        if lower.endswith(".jpg"):
+            ext = ".jpg"
+        elif lower.endswith(".jpeg"):
+            ext = ".jpeg"
+        elif lower.endswith(".png"):
+            ext = ".png"
+        else:
+            ext = ".webp"
+
+        safe_name = f"{uuid.uuid4().hex}{ext}"
+        upload_dir = Path(__file__).resolve().parent.parent / "uploads" / "services"
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        target_path = upload_dir / safe_name
+
+        with target_path.open("wb") as out_file:
+            out_file.write(file.file.read())
+
+        image_url = f"/uploads/services/{safe_name}"
+
     new_service = models.Service(
         pandit_id=pandit.id,
-        name=service.name,
-        category=service.category,
-        description=service.description,
-        image_url=service.image_url,
-        base_price=service.base_price,
-        duration_minutes=service.duration_minutes
+        name=name,
+        category=category,
+        description=description,
+        image_url=image_url,
+        base_price=base_price,
+        duration_minutes=duration_minutes
     )
     db.add(new_service)
     db.commit()
     db.refresh(new_service)
-    return {"msg": "Service added successfully", "service_id": str(new_service.id)}
+    return {
+        "msg": "Service added successfully",
+        "service_id": str(new_service.id),
+        "image_url": new_service.image_url,
+    }
 
 # View my services
 @router.get("/pandit/services", response_model=list[schemas.ServiceResponse])

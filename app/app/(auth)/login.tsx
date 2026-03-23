@@ -22,6 +22,8 @@ export default function LoginScreen() {
     location: '',
     email: '',
     dob: '',
+    timeOfBirth: '',
+    placeOfBirth: '',
   });
   const [panditForm, setPanditForm] = useState({
     fullName: '',
@@ -80,6 +82,8 @@ export default function LoginScreen() {
           password: registerForm.password,
           email: registerForm.email || null,
           dob: registerForm.dob || null,
+          time_of_birth: registerForm.timeOfBirth || null,
+          place_of_birth: registerForm.placeOfBirth || null,
           location_name: registerForm.location || null,
         }),
       });
@@ -213,6 +217,16 @@ export default function LoginScreen() {
                   label="Date of Birth (Optional, YYYY-MM-DD)"
                   value={registerForm.dob}
                   onChangeText={(text) => setRegisterForm((prev) => ({ ...prev, dob: text }))}
+                />
+                <AppTextInput
+                  label="Time of Birth (Optional, HH:MM)"
+                  value={registerForm.timeOfBirth}
+                  onChangeText={(text) => setRegisterForm((prev) => ({ ...prev, timeOfBirth: text }))}
+                />
+                <AppTextInput
+                  label="Place of Birth (Optional)"
+                  value={registerForm.placeOfBirth}
+                  onChangeText={(text) => setRegisterForm((prev) => ({ ...prev, placeOfBirth: text }))}
                 />
                 <AppTextInput
                   label="Location (Optional)"

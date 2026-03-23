@@ -10,7 +10,7 @@ import Screen from '@/components/Screen';
 import Tag from '@/components/Tag';
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
 import { useAuth } from '@/context/AuthContext';
-import { apiPost } from '@/lib/api';
+import { apiGet, apiPost } from '@/lib/api';
 
 type InsightMode =
   | 'complete'
@@ -38,6 +38,13 @@ type InsightOption = {
 };
 
 type JsonRecord = Record<string, unknown>;
+
+type UserBirthProfile = {
+  full_name?: string;
+  dob?: string;
+  time_of_birth?: string;
+  place_of_birth?: string;
+};
 
 const INSIGHT_OPTIONS: InsightOption[] = [
   {
@@ -184,11 +191,8 @@ export default function HoroscopeScreen() {
   const { token, ready } = useAuth();
 
   const [selectedMode, setSelectedMode] = useState<InsightMode>('complete');
-
-  const [name, setName] = useState('');
-  const [dob, setDob] = useState('');
-  const [tob, setTob] = useState('');
-  const [place, setPlace] = useState('');
+  const [birthProfile, setBirthProfile] = useState<UserBirthProfile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
   const [topic, setTopic] = useState('daily guidance for my day');
   const [dateValue, setDateValue] = useState('');
   const [predictAlertDays, setPredictAlertDays] = useState('7');
@@ -205,8 +209,30 @@ export default function HoroscopeScreen() {
     if (!ready) return;
     if (!token) {
       router.replace('/(auth)/login');
+      return;
     }
+
+    const loadBirthProfile = async () => {
+      setProfileLoading(true);
+      try {
+        const profile = await apiGet<UserBirthProfile>('/user/profile', token);
+        setBirthProfile(profile);
+      } catch {
+        setBirthProfile(null);
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    loadBirthProfile();
   }, [ready, token]);
+
+  const profileName = birthProfile?.full_name?.trim() || '';
+  const profileDob = birthProfile?.dob?.trim() || '';
+  const profileTob = birthProfile?.time_of_birth?.trim() || '';
+  const profilePlace = birthProfile?.place_of_birth?.trim() || '';
+  const hasCompleteBirth = !!(profileName && profileDob && profileTob && profilePlace);
+  const hasPlaceOnly = !!profilePlace;
 
   const selectedOption = useMemo(
     () => INSIGHT_OPTIONS.find((option) => option.id === selectedMode) ?? INSIGHT_OPTIONS[0],
@@ -220,13 +246,17 @@ export default function HoroscopeScreen() {
 
   const requirementHint = useMemo(() => {
     if (selectedOption.requiresBirth) {
-      return 'Required now: Name, date of birth, time of birth and place.';
+      return hasCompleteBirth
+        ? 'Using saved birth details from your profile.'
+        : 'Birth details are missing. Save them in Profile tab to generate this insight.';
     }
     if (selectedOption.requiresPlace) {
-      return 'Required now: Place.';
+      return hasPlaceOnly
+        ? 'Using saved place of birth from your profile.'
+        : 'Place of birth is missing. Save it in Profile tab to generate this insight.';
     }
     return 'No required fields for this insight.';
-  }, [selectedOption]);
+  }, [selectedOption, hasCompleteBirth, hasPlaceOnly]);
 
   const parseBoundedInt = (raw: string, label: string, min: number, max: number): number | null => {
     const value = Number.parseInt(raw, 10);
@@ -242,19 +272,13 @@ export default function HoroscopeScreen() {
   };
 
   const validateInputs = (option: InsightOption): boolean => {
-    const missing: string[] = [];
-
     if (option.requiresBirth) {
-      if (!name.trim()) missing.push('Name');
-      if (!dob.trim()) missing.push('Date of birth');
-      if (!tob.trim()) missing.push('Time of birth');
-      if (!place.trim()) missing.push('Place');
-    } else if (option.requiresPlace && !place.trim()) {
-      missing.push('Place');
-    }
-
-    if (missing.length > 0) {
-      setErrorText(`Please fill: ${missing.join(', ')}.`);
+      if (!hasCompleteBirth) {
+        setErrorText('Birth details missing. Please save name, DOB, time and place in Profile tab first.');
+        return false;
+      }
+    } else if (option.requiresPlace && !hasPlaceOnly) {
+      setErrorText('Place of birth missing. Please save it in Profile tab first.');
       return false;
     }
     return true;
@@ -265,10 +289,10 @@ export default function HoroscopeScreen() {
     if (!validateInputs(selectedOption)) return;
 
     const birthPayload = {
-      name: name.trim(),
-      dob: dob.trim(),
-      tob: tob.trim(),
-      place: place.trim(),
+      name: profileName,
+      dob: profileDob,
+      tob: profileTob,
+      place: profilePlace,
     };
 
     let requestPromise: Promise<unknown>;
@@ -303,7 +327,7 @@ export default function HoroscopeScreen() {
       requestPromise = apiPost(
         '/panchang/today',
         {
-          place: place.trim(),
+          place: profilePlace,
           date: dateValue.trim() || undefined,
         },
         token
@@ -312,7 +336,7 @@ export default function HoroscopeScreen() {
       requestPromise = apiPost(
         '/moon-phase/today',
         {
-          place: place.trim(),
+          place: profilePlace,
           date: dateValue.trim() || undefined,
         },
         token
@@ -328,7 +352,7 @@ export default function HoroscopeScreen() {
       requestPromise = apiPost(
         '/alerts',
         {
-          place: place.trim(),
+          place: profilePlace,
           days_ahead: parsedAlertDays,
         },
         token
@@ -340,7 +364,7 @@ export default function HoroscopeScreen() {
       requestPromise = apiPost(
         '/muhurat',
         {
-          place: place.trim(),
+          place: profilePlace,
           days_ahead: parsedMuhuratDays,
         },
         token
@@ -771,25 +795,25 @@ export default function HoroscopeScreen() {
         <Text style={styles.sectionTitle}>Your Details</Text>
         <Text style={styles.requirementHint}>{requirementHint}</Text>
 
-        <AppTextInput label="Name" placeholder="Full name" value={name} onChangeText={setName} />
-        <AppTextInput
-          label="Date Of Birth"
-          placeholder="YYYY-MM-DD"
-          value={dob}
-          onChangeText={setDob}
-        />
-        <AppTextInput
-          label="Time Of Birth"
-          placeholder="HH:MM (24h)"
-          value={tob}
-          onChangeText={setTob}
-        />
-        <AppTextInput
-          label="Place"
-          placeholder="City, Country"
-          value={place}
-          onChangeText={setPlace}
-        />
+        {profileLoading ? (
+          <View style={styles.loadingWrapInline}>
+            <ActivityIndicator color={colors.orange600} />
+            <Text style={styles.loadingText}>Loading saved profile details...</Text>
+          </View>
+        ) : (
+          <Card style={styles.innerCardMuted}>
+            <DetailRow label="Name" value={profileName || '--'} />
+            <DetailRow label="Date Of Birth" value={profileDob || '--'} />
+            <DetailRow label="Time Of Birth" value={profileTob || '--'} />
+            <DetailRow label="Place Of Birth" value={profilePlace || '--'} />
+            <AppButton
+              title="Edit Birth Details In Profile"
+              variant="secondary"
+              onPress={() => router.push('/(tabs)/profile')}
+              style={styles.profileRedirectButton}
+            />
+          </Card>
+        )}
 
         {selectedOption.usesTopic ? (
           <>
@@ -864,7 +888,7 @@ export default function HoroscopeScreen() {
 
         <AppButton
           title={loading ? 'Generating Insight...' : selectedOption.cta}
-          disabled={loading}
+          disabled={loading || profileLoading}
           onPress={runSelectedInsight}
           style={styles.generateButton}
         />
@@ -1012,6 +1036,24 @@ const styles = StyleSheet.create({
   },
   generateButton: {
     marginTop: 4,
+  },
+  loadingWrapInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: spacing.sm,
+  },
+  innerCardMuted: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#eadbc9',
+    backgroundColor: '#fff9f2',
+    padding: spacing.sm,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  profileRedirectButton: {
+    marginTop: 8,
   },
   resultHeadRow: {
     flexDirection: 'row',

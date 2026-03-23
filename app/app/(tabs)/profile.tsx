@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import Screen from '@/components/Screen';
 import Card from '@/components/Card';
 import AppButton from '@/components/AppButton';
@@ -23,9 +23,24 @@ type PanditProfile = {
   longitude?: number;
 };
 
+type UserProfile = {
+  full_name?: string;
+  phone?: string;
+  email?: string;
+  dob?: string;
+  time_of_birth?: string;
+  place_of_birth?: string;
+};
+
 export default function ProfileScreen() {
   const { token, userType, ready, signOut } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [birthForm, setBirthForm] = useState({
+    dob: '',
+    timeOfBirth: '',
+    placeOfBirth: '',
+  });
   const [form, setForm] = useState({
     fullName: '',
     phone: '',
@@ -46,35 +61,74 @@ export default function ProfileScreen() {
       router.replace('/(auth)/login');
       return;
     }
-    if (userType === 'pandit') {
-      loadProfile();
-    } else {
-      setLoading(false);
-    }
+    loadProfile();
   }, [ready, token, userType]);
 
   const loadProfile = async () => {
     if (!token) return;
     setLoading(true);
     try {
-      const data = await apiGet<PanditProfile>('/pandit/profile', token);
-      setForm({
-        fullName: data.full_name || '',
-        phone: data.phone || '',
-        email: data.email || '',
-        experienceYears: data.experience_years?.toString() || '',
-        bio: data.bio || '',
-        region: data.region || '',
-        languages: data.languages || '',
-        pricePerService: data.price_per_service?.toString() || '',
-        locationName: data.location_name || '',
-        latitude: data.latitude?.toString() || '',
-        longitude: data.longitude?.toString() || '',
-      });
+      if (userType === 'pandit') {
+        const data = await apiGet<PanditProfile>('/pandit/profile', token);
+        setForm({
+          fullName: data.full_name || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          experienceYears: data.experience_years?.toString() || '',
+          bio: data.bio || '',
+          region: data.region || '',
+          languages: data.languages || '',
+          pricePerService: data.price_per_service?.toString() || '',
+          locationName: data.location_name || '',
+          latitude: data.latitude?.toString() || '',
+          longitude: data.longitude?.toString() || '',
+        });
+      } else {
+        const data = await apiGet<UserProfile>('/user/profile', token);
+        setUserProfile(data);
+        setBirthForm({
+          dob: data.dob || '',
+          timeOfBirth: data.time_of_birth || '',
+          placeOfBirth: data.place_of_birth || '',
+        });
+      }
     } catch (error) {
       console.error('Load profile error', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveBirthDetails = async () => {
+    if (!token) return;
+    const timeRegex = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (birthForm.timeOfBirth && !timeRegex.test(birthForm.timeOfBirth)) {
+      Alert.alert('Invalid Time', 'Time of birth must be in HH:MM 24-hour format');
+      return;
+    }
+
+    try {
+      const payload = {
+        dob: birthForm.dob || null,
+        time_of_birth: birthForm.timeOfBirth || null,
+        place_of_birth: birthForm.placeOfBirth || null,
+      };
+      const res = await apiPut<any>('/user/profile/dob', payload, token);
+      setBirthForm({
+        dob: res?.dob || '',
+        timeOfBirth: res?.time_of_birth || '',
+        placeOfBirth: res?.place_of_birth || '',
+      });
+      setUserProfile((prev) => ({
+        ...(prev || {}),
+        dob: res?.dob || undefined,
+        time_of_birth: res?.time_of_birth || undefined,
+        place_of_birth: res?.place_of_birth || undefined,
+      }));
+      Alert.alert('Success', 'Birth details updated');
+    } catch (error) {
+      console.error('Save birth details error', error);
+      Alert.alert('Error', 'Failed to update birth details');
     }
   };
 
@@ -126,11 +180,35 @@ export default function ProfileScreen() {
       <Text style={styles.pageSubtitle}>Keep your profile and location up to date.</Text>
 
       {userType !== 'pandit' ? (
-        <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Account Settings</Text>
-          <Text style={styles.cardSub}>Manage your sign in and preferences.</Text>
-          <AppButton title="Sign Out" variant="secondary" onPress={signOut} />
-        </Card>
+        <>
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Birth Details</Text>
+            <Text style={styles.cardSub}>Add now or update later for horoscope and personalized services.</Text>
+            <AppTextInput
+              label="Date of Birth (YYYY-MM-DD)"
+              value={birthForm.dob}
+              onChangeText={(text) => setBirthForm((prev) => ({ ...prev, dob: text }))}
+            />
+            <AppTextInput
+              label="Time of Birth (HH:MM, 24-hour)"
+              value={birthForm.timeOfBirth}
+              onChangeText={(text) => setBirthForm((prev) => ({ ...prev, timeOfBirth: text }))}
+            />
+            <AppTextInput
+              label="Place of Birth"
+              value={birthForm.placeOfBirth}
+              onChangeText={(text) => setBirthForm((prev) => ({ ...prev, placeOfBirth: text }))}
+            />
+            <AppButton title="Save Birth Details" onPress={saveBirthDetails} />
+            {userProfile?.full_name ? <Text style={styles.cardSub}>Account: {userProfile.full_name}</Text> : null}
+          </Card>
+
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Account Settings</Text>
+            <Text style={styles.cardSub}>Manage your sign in and preferences.</Text>
+            <AppButton title="Sign Out" variant="secondary" onPress={signOut} />
+          </Card>
+        </>
       ) : (
         <>
           <Card style={styles.card}>

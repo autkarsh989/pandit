@@ -8,7 +8,7 @@ from database import Base, engine
 from routers import auth_routes, pandit_routes, user_routes, admin_routes , horoscope_routes
 import os
 import config
-from routers import auth_routes, pandit_routes, user_routes, admin_routes, banner_routes, special_offer_routes, global_pricing_routes
+from routers import auth_routes, pandit_routes, user_routes, admin_routes, banner_routes, special_offer_routes, global_pricing_routes, quotes_routes, notification_settings_routes
 
 app = FastAPI()
 
@@ -67,6 +67,8 @@ app.include_router(horoscope_routes.router, tags=["Horoscope"])
 app.include_router(banner_routes.router, tags=["Banners"])
 app.include_router(special_offer_routes.router, tags=["Special Offers"])
 app.include_router(global_pricing_routes.router, tags=["Global Pricing"])
+app.include_router(quotes_routes.router, tags=["Quotes"])
+app.include_router(notification_settings_routes.router, tags=["Notification Settings"])
 
 @app.get("/")
 def root():

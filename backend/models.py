@@ -149,3 +149,13 @@ class GlobalPricing(Base):
     created_by = Column(String(36), ForeignKey("admins.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class NotificationSchedule(Base):
+    __tablename__ = "notification_schedule"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    send_times = Column(Text, default='["05:00", "10:00", "17:00"]')
+    updated_by = Column(String(36), ForeignKey("admins.id"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -168,6 +168,11 @@ export default function AdminDashboardScreen() {
             onPress={() => handleNavigation('/admin/global-pricing', 'Global Pricing')}
           />
           <AppButton
+            title="Notify Times"
+            variant="secondary"
+            onPress={() => handleNavigation('/admin/notification-settings', 'Notification Timing')}
+          />
+          <AppButton
             title="Reports"
             variant="secondary"
             onPress={() => Alert.alert('Coming Soon', 'Reports feature will be available soon!')}

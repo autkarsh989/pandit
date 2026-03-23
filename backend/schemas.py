@@ -331,3 +331,18 @@ class GlobalPricingResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class NotificationScheduleUpdate(BaseModel):
+    send_times: list[str] = Field(
+        ...,
+        min_length=1,
+        max_length=6,
+        description="List of daily notification times in HH:MM 24h format",
+    )
+
+
+class NotificationScheduleResponse(BaseModel):
+    send_times: list[str]
+    updated_by: Optional[str]
+    updated_at: datetime

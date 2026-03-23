@@ -16,6 +16,7 @@ import {
 import 'react-native-reanimated';
 
 import { AuthProvider } from '@/context/AuthContext';
+import { initializeDailyQuoteNotifications } from '@/lib/quoteNotifications';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -45,6 +46,11 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
+  useEffect(() => {
+    const cleanup = initializeDailyQuoteNotifications();
+    return cleanup;
+  }, []);
+
   if (!loaded) {
     return null;
   }
@@ -61,6 +67,7 @@ export default function RootLayout() {
           <Stack.Screen name="admin/banners" />
           <Stack.Screen name="admin/special-offers" />
           <Stack.Screen name="admin/global-pricing" />
+          <Stack.Screen name="admin/notification-settings" />
         </Stack>
       </AuthProvider>
     </ThemeProvider>

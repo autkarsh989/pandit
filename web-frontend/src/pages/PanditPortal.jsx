@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { API_BASE_URL, ASSET_BASE_URL } from '../api/config.js';
+import kalashImage from '../assets/kalash.png';
 import { getAuthToken } from '../api/client.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
@@ -259,12 +260,10 @@ export default function PanditPortal() {
               services.map((service) => (
                 <div className="service-card" key={service.id}>
                   <div
-                    className={`service-thumb portal-service-thumb ${service.image_url ? 'has-image' : ''}`}
-                    style={
-                      service.image_url
-                        ? { backgroundImage: `url(${ASSET_BASE_URL}${service.image_url})` }
-                        : undefined
-                    }
+                    className="service-thumb portal-service-thumb has-image"
+                    style={{
+                      backgroundImage: `url(${service.image_url ? `${ASSET_BASE_URL}${service.image_url}` : kalashImage})`,
+                    }}
                   />
                   <div className="service-body">
                     <div>

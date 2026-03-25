@@ -29,6 +29,22 @@ type Service = {
   pandit_id: string;
 };
 
+type SpecialOffer = {
+  id: string;
+  title: string;
+  description: string;
+  discount_percentage?: number;
+  discount_amount?: number;
+  target_audience: 'user' | 'pandit' | 'both';
+};
+
+type GlobalPricing = {
+  id: string;
+  discount_percentage: number;
+  description?: string;
+  is_active: boolean;
+};
+
 export default function ServicesScreen() {
   const { token, ready } = useAuth();
   const [services, setServices] = useState<Service[]>([]);
@@ -39,6 +55,8 @@ export default function ServicesScreen() {
   const [bookingDate, setBookingDate] = useState('');
   const [serviceAddress, setServiceAddress] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [specialOffers, setSpecialOffers] = useState<SpecialOffer[]>([]);
+  const [globalPricing, setGlobalPricing] = useState<GlobalPricing | null>(null);
 
   useEffect(() => {
     if (!ready) return;
@@ -47,7 +65,27 @@ export default function ServicesScreen() {
       return;
     }
     loadServices();
+    loadPricing();
   }, [ready, token]);
+
+  const loadPricing = async () => {
+    if (!token) return;
+    try {
+      const [offersResponse, pricingResponse] = await Promise.all([
+        apiGet<SpecialOffer[]>('/special-offers/active', token).catch(() => []),
+        apiGet<GlobalPricing | null>('/global-pricing/current', token).catch(() => null),
+      ]);
+      const applicableOffers = Array.isArray(offersResponse)
+        ? offersResponse.filter(
+            (offer) => offer.target_audience === 'user' || offer.target_audience === 'both'
+          )
+        : [];
+      setSpecialOffers(applicableOffers);
+      setGlobalPricing(pricingResponse);
+    } catch (error) {
+      console.error('Load pricing error', error);
+    }
+  };
 
   const loadServices = async () => {
     setLoading(true);
@@ -114,6 +152,28 @@ export default function ServicesScreen() {
     } catch (error) {
       console.error('Create booking error', error);
     }
+  };
+
+  const getDiscountedPrice = (basePrice: number) => {
+    let bestPrice = basePrice;
+
+    if (globalPricing?.discount_percentage && globalPricing.discount_percentage > 0) {
+      const discounted = basePrice * (1 - globalPricing.discount_percentage / 100);
+      bestPrice = Math.min(bestPrice, discounted);
+    }
+
+    specialOffers.forEach((offer) => {
+      if (offer.discount_percentage && offer.discount_percentage > 0) {
+        const discounted = basePrice * (1 - offer.discount_percentage / 100);
+        bestPrice = Math.min(bestPrice, discounted);
+      }
+      if (offer.discount_amount && offer.discount_amount > 0) {
+        const discounted = basePrice - offer.discount_amount;
+        bestPrice = Math.min(bestPrice, discounted);
+      }
+    });
+
+    return Math.max(0, Math.round(bestPrice));
   };
 
   return (
@@ -196,7 +256,12 @@ export default function ServicesScreen() {
                   resizeMode="cover"
                 />
               ) : (
-                <View style={styles.thumb} />
+                <ImageBackground
+                  source={require('@/assets/images/kalash.png')}
+                  style={styles.thumb}
+                  imageStyle={styles.thumbImage}
+                  resizeMode="cover"
+                />
               )}
               <Text style={styles.cardTitle}>{service.name}</Text>
               <Text style={styles.cardSub}>{service.category} service for sacred moments.</Text>
@@ -208,7 +273,7 @@ export default function ServicesScreen() {
                 <Text style={styles.cardSub}>{service.description}</Text>
               ) : null}
               <View style={styles.cardFooter}>
-                <Text style={styles.price}>Rs {service.base_price}</Text>
+                <Text style={styles.price}>Rs {getDiscountedPrice(service.base_price)}</Text>
                 <AppButton title="Book Now" onPress={() => openBooking(service)} />
               </View>
             </Card>
@@ -235,7 +300,9 @@ export default function ServicesScreen() {
               <View style={styles.summaryBox}>
                 <Text style={styles.summaryText}>Service: {selected.name}</Text>
                 <Text style={styles.summaryText}>Category: {selected.category}</Text>
-                <Text style={styles.summaryText}>Price: Rs {selected.base_price}</Text>
+                <Text style={styles.summaryText}>
+                  Price: Rs {getDiscountedPrice(selected.base_price)}
+                </Text>
                 <Text style={styles.summaryText}>
                   Duration: {selected.duration_minutes} minutes
                 </Text>
@@ -274,7 +341,7 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: colors.card,
     borderRadius: radius.xl,
-    padding: spacing.lg,
+    padding: spacing.md,
     ...shadow.lift,
   },
   heroBadge: {
@@ -286,18 +353,18 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     fontFamily: fonts.headingBold,
-    fontSize: 24,
+    fontSize: 20,
     color: colors.ink900,
-    marginTop: 8,
+    marginTop: 6,
   },
   heroSubtitle: {
     fontFamily: fonts.body,
     color: colors.ink500,
-    marginTop: 8,
+    marginTop: 6,
   },
   searchRow: {
-    marginTop: 14,
-    gap: 10,
+    marginTop: 10,
+    gap: 8,
   },
   searchInput: {
     borderWidth: 1,
@@ -310,14 +377,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   section: {
-    marginTop: spacing.xl,
+    marginTop: spacing.md,
   },
   sectionHeader: {
-    marginBottom: 10,
+    marginBottom: 8,
   },
   sectionTitle: {
     fontFamily: fonts.heading,
-    fontSize: 20,
+    fontSize: 18,
     color: colors.ink900,
   },
   sectionSub: {
@@ -329,8 +396,8 @@ const styles = StyleSheet.create({
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
+    gap: 6,
+    marginBottom: 10,
   },
   chip: {
     paddingHorizontal: 12,
@@ -354,7 +421,7 @@ const styles = StyleSheet.create({
   },
   sortRow: {
     alignItems: 'flex-end',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   sortButton: {
     backgroundColor: '#fff',
@@ -376,16 +443,16 @@ const styles = StyleSheet.create({
     marginVertical: 12,
   },
   grid: {
-    gap: 12,
+    gap: 10,
   },
   serviceCard: {
-    gap: 8,
+    gap: 6,
   },
   thumb: {
-    height: 120,
+    height: 140,
     borderRadius: radius.md,
     backgroundColor: '#f1e3d4',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   thumbImage: {
     borderRadius: radius.md,
@@ -408,8 +475,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 6,
-    gap: 10,
+    marginTop: 4,
+    gap: 8,
   },
   price: {
     fontFamily: fonts.bodyBold,

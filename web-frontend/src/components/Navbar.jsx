@@ -35,6 +35,26 @@ export default function Navbar() {
                 </NavLink>
               </li>
               <li>
+                <NavLink to="/admin/banners" className={navLinkClass}>
+                  Banners
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/admin/special-offers" className={navLinkClass}>
+                  Offers
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/admin/global-pricing" className={navLinkClass}>
+                  Pricing
+                </NavLink>
+              </li>
+              <li>
+                <NavLink to="/admin/notification-settings" className={navLinkClass}>
+                  Notify Times
+                </NavLink>
+              </li>
+              <li>
                 <button type="button" className="link-button" onClick={handleLogout}>
                   Logout
                 </button>
@@ -73,6 +93,11 @@ export default function Navbar() {
                     </NavLink>
                   </li>
                   <li>
+                    <NavLink to="/horoscope" className={navLinkClass}>
+                      Horoscope
+                    </NavLink>
+                  </li>
+                  <li>
                     <NavLink to="/pandits" className={navLinkClass}>
                       Find Pandits
                     </NavLink>
@@ -80,6 +105,11 @@ export default function Navbar() {
                   <li>
                     <NavLink to="/bookings" className={navLinkClass}>
                       My Bookings
+                    </NavLink>
+                  </li>
+                  <li>
+                    <NavLink to="/profile" className={navLinkClass}>
+                      Profile
                     </NavLink>
                   </li>
                 </>

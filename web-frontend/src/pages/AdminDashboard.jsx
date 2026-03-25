@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../api/config.js';
 import { getAuthToken } from '../api/client.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
   const { message, showMessage } = useFlashMessage();
   const [stats, setStats] = useState(null);
   const [pendingPandits, setPendingPandits] = useState([]);
@@ -134,6 +136,29 @@ export default function AdminDashboard() {
               ))}
             </div>
           )}
+        </section>
+
+        <section className="section">
+          <div className="section-heading">
+            <div>
+              <h2 className="section-title">Quick Actions</h2>
+              <p className="section-subtitle">Jump to core admin tools</p>
+            </div>
+          </div>
+          <div className="admin-actions-grid">
+            <button type="button" className="btn btn-secondary" onClick={() => navigate('/admin/banners')}>
+              Banners
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => navigate('/admin/special-offers')}>
+              Offers
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => navigate('/admin/global-pricing')}>
+              Pricing
+            </button>
+            <button type="button" className="btn btn-secondary" onClick={() => navigate('/admin/notification-settings')}>
+              Notify Times
+            </button>
+          </div>
         </section>
 
         <section className="section">

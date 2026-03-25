@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, ASSET_BASE_URL } from '../api/config.js';
+import kalashImage from '../assets/kalash.png';
 import { getAuthToken } from '../api/client.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
@@ -16,9 +17,12 @@ export default function Services() {
   const [selectedService, setSelectedService] = useState(null);
   const [bookingDate, setBookingDate] = useState('');
   const [serviceAddress, setServiceAddress] = useState('');
+  const [specialOffers, setSpecialOffers] = useState([]);
+  const [globalPricing, setGlobalPricing] = useState(null);
 
   useEffect(() => {
     loadServices();
+    loadPricing();
   }, []);
 
   const loadServices = async (skipOverride = null) => {
@@ -75,6 +79,29 @@ export default function Services() {
     }
   };
 
+  const loadPricing = async () => {
+    try {
+      const token = getAuthToken();
+      const [offersRes, pricingRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/special-offers/active`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/global-pricing/current`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+      const offersData = offersRes.ok ? await offersRes.json() : [];
+      const pricingData = pricingRes.ok ? await pricingRes.json() : null;
+      const applicableOffers = Array.isArray(offersData)
+        ? offersData.filter((offer) => offer.target_audience === 'user' || offer.target_audience === 'both')
+        : [];
+      setSpecialOffers(applicableOffers);
+      setGlobalPricing(pricingData || null);
+    } catch (error) {
+      console.error('Load pricing error:', error);
+    }
+  };
+
   const openBooking = async (service) => {
     setSelectedService(service);
     setBookingDate('');
@@ -125,18 +152,42 @@ export default function Services() {
     }
   };
 
+  const getDiscountedPrice = (basePrice) => {
+    let bestPrice = basePrice;
+
+    if (globalPricing?.discount_percentage && globalPricing.discount_percentage > 0) {
+      const discounted = basePrice * (1 - globalPricing.discount_percentage / 100);
+      bestPrice = Math.min(bestPrice, discounted);
+    }
+
+    specialOffers.forEach((offer) => {
+      if (offer.discount_percentage && offer.discount_percentage > 0) {
+        const discounted = basePrice * (1 - offer.discount_percentage / 100);
+        bestPrice = Math.min(bestPrice, discounted);
+      }
+      if (offer.discount_amount && offer.discount_amount > 0) {
+        const discounted = basePrice - offer.discount_amount;
+        bestPrice = Math.min(bestPrice, discounted);
+      }
+    });
+
+    return Math.max(0, Math.round(bestPrice));
+  };
+
   const bookingSummary = useMemo(() => {
     if (!selectedService) {
       return null;
     }
 
+    const discountedPrice = getDiscountedPrice(selectedService.base_price);
     return {
       serviceName: selectedService.name,
       category: selectedService.category,
-      price: selectedService.base_price,
+      price: discountedPrice,
+      basePrice: selectedService.base_price,
       duration: selectedService.duration_minutes,
     };
-  }, [selectedService]);
+  }, [selectedService, specialOffers, globalPricing]);
 
   const categories = useMemo(() => {
     const unique = new Set(services.map((service) => service.category).filter(Boolean));
@@ -225,15 +276,16 @@ export default function Services() {
               <p className="no-results">No services found</p>
             ) : null}
             {!loading
-              ? filteredServices.map((service) => (
+              ? filteredServices.map((service) => {
+                const discountedPrice = getDiscountedPrice(service.base_price);
+                const imageUrl = service.image_url
+                  ? `${ASSET_BASE_URL}${service.image_url}`
+                  : kalashImage;
+                return (
                 <div className="service-card" key={service.id}>
                   <div
-                    className={`service-thumb ${service.image_url ? 'has-image' : ''}`}
-                    style={
-                      service.image_url
-                        ? { backgroundImage: `url(${ASSET_BASE_URL}${service.image_url})` }
-                        : undefined
-                    }
+                    className="service-thumb has-image"
+                    style={{ backgroundImage: `url(${imageUrl})` }}
                   />
                     <div className="service-body">
                       <div>
@@ -249,8 +301,15 @@ export default function Services() {
                       {service.description ? (
                         <p className="section-subtitle">{service.description}</p>
                       ) : null}
-                      <div className="service-footer">
-                        <span className="service-price">Starting at Rs {service.base_price}</span>
+                    <div className="service-footer">
+                        <span className="service-price">
+                          Rs {discountedPrice}
+                          {discountedPrice < service.base_price ? (
+                            <span className="service-price-original">
+                              Rs {service.base_price}
+                            </span>
+                          ) : null}
+                        </span>
                         <button
                           type="button"
                           className="btn btn-primary"
@@ -261,7 +320,8 @@ export default function Services() {
                       </div>
                     </div>
                   </div>
-                ))
+                );
+                })
               : null}
           </div>
           {services.length >= serviceMeta.limit ? (
@@ -303,6 +363,11 @@ export default function Services() {
                   </p>
                   <p>
                     <strong>Price:</strong> Rs {bookingSummary.price}
+                    {bookingSummary.price < bookingSummary.basePrice ? (
+                      <span className="service-price-original">
+                        Rs {bookingSummary.basePrice}
+                      </span>
+                    ) : null}
                   </p>
                   <p>
                     <strong>Duration:</strong> {bookingSummary.duration} minutes

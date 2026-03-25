@@ -5,12 +5,18 @@ import Dashboard from './pages/Dashboard.jsx';
 import Services from './pages/Services.jsx';
 import Pandits from './pages/Pandits.jsx';
 import Bookings from './pages/Bookings.jsx';
+import Horoscope from './pages/Horoscope.jsx';
 import PanditOnboard from './pages/PanditOnboard.jsx';
 import ManageServices from './pages/ManageServices.jsx';
 import AdminLogin from './pages/AdminLogin.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import AdminBanners from './pages/AdminBanners.jsx';
+import AdminSpecialOffers from './pages/AdminSpecialOffers.jsx';
+import AdminGlobalPricing from './pages/AdminGlobalPricing.jsx';
+import AdminNotificationSettings from './pages/AdminNotificationSettings.jsx';
 import PanditPortal from './pages/PanditPortal.jsx';
 import PanditProfile from './pages/PanditProfile.jsx';
+import UserProfile from './pages/UserProfile.jsx';
 
 function ProtectedRoute({ children, allowedTypes }) {
   const token = localStorage.getItem('token');
@@ -69,6 +75,16 @@ export default function App() {
         }
       />
       <Route
+        path="/horoscope"
+        element={
+          <ProtectedRoute allowedTypes={['user']}>
+            <AppLayout>
+              <Horoscope />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/pandits"
         element={
           <ProtectedRoute allowedTypes={['user']}>
@@ -115,11 +131,61 @@ export default function App() {
         }
       />
       <Route
+        path="/profile"
+        element={
+          <ProtectedRoute allowedTypes={['user']}>
+            <AppLayout>
+              <UserProfile />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/pandit/profile"
         element={
           <ProtectedRoute allowedTypes={['pandit']}>
             <AppLayout>
               <PanditProfile />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/banners"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <AppLayout>
+              <AdminBanners />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/special-offers"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <AppLayout>
+              <AdminSpecialOffers />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/global-pricing"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <AppLayout>
+              <AdminGlobalPricing />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/notification-settings"
+        element={
+          <ProtectedRoute allowedTypes={['admin']}>
+            <AppLayout>
+              <AdminNotificationSettings />
             </AppLayout>
           </ProtectedRoute>
         }

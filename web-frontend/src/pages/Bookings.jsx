@@ -182,6 +182,46 @@ export default function Bookings() {
     [bookings, statusGroups]
   );
 
+  const canCompleteBooking = (booking) => {
+    if (booking.status !== 'confirmed') return false;
+    try {
+      const dateValue = booking.booking_date.includes(' ')
+        ? new Date(booking.booking_date)
+        : new Date(`${booking.booking_date} 00:00:00`);
+      const now = new Date();
+      if (now < dateValue) {
+        return false;
+      }
+      const diff = now.getTime() - dateValue.getTime();
+      const minBuffer = 30 * 60 * 1000;
+      return diff >= minBuffer;
+    } catch {
+      return true;
+    }
+  };
+
+  const getCompletionMessage = (booking) => {
+    if (booking.status !== 'confirmed') return '';
+    try {
+      const dateValue = booking.booking_date.includes(' ')
+        ? new Date(booking.booking_date)
+        : new Date(`${booking.booking_date} 00:00:00`);
+      const now = new Date();
+      if (now < dateValue) {
+        return `Can complete after ${dateValue.toLocaleString()}`;
+      }
+      const diff = now.getTime() - dateValue.getTime();
+      const minBuffer = 30 * 60 * 1000;
+      if (diff < minBuffer) {
+        const remainingMinutes = Math.ceil((minBuffer - diff) / (60 * 1000));
+        return `Can complete in ${remainingMinutes} minutes`;
+      }
+      return '';
+    } catch {
+      return '';
+    }
+  };
+
   return (
     <div className="container">
       <div className="page-header booking-header">
@@ -344,29 +384,37 @@ export default function Bookings() {
                           </>
                         ) : null}
                         {booking.status === 'confirmed' ? (
-                          <button
-                            type="button"
-                            className="btn btn-primary"
-                            onClick={async () => {
-                              const token = getAuthToken();
-                              const response = await fetch(
-                                `${API_BASE_URL}/pandit/bookings/${booking.id}/complete`,
-                                {
-                                  method: 'PUT',
-                                  headers: { Authorization: `Bearer ${token}` },
+                          <div className="completion-wrap">
+                            <button
+                              type="button"
+                              className="btn btn-primary"
+                              disabled={!canCompleteBooking(booking)}
+                              onClick={async () => {
+                                const token = getAuthToken();
+                                const response = await fetch(
+                                  `${API_BASE_URL}/pandit/bookings/${booking.id}/complete`,
+                                  {
+                                    method: 'PUT',
+                                    headers: { Authorization: `Bearer ${token}` },
+                                  }
+                                );
+                                if (response.ok) {
+                                  showMessage('Booking marked as completed', 'success');
+                                  loadBookings();
+                                } else {
+                                  const error = await response.json();
+                                  showMessage(error.detail || 'Failed to complete booking', 'error');
                                 }
-                              );
-                              if (response.ok) {
-                                showMessage('Booking marked as completed', 'success');
-                                loadBookings();
-                              } else {
-                                const error = await response.json();
-                                showMessage(error.detail || 'Failed to complete booking', 'error');
-                              }
-                            }}
-                          >
-                            Mark Completed
-                          </button>
+                              }}
+                            >
+                              Mark Completed
+                            </button>
+                            {!canCompleteBooking(booking) ? (
+                              <span className="completion-message">
+                                {getCompletionMessage(booking)}
+                              </span>
+                            ) : null}
+                          </div>
                         ) : null}
                         {booking.status === 'completed' && !booking.reviewed_by_pandit ? (
                           <button

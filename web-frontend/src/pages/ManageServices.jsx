@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { API_BASE_URL } from '../api/config.js';
+import { API_BASE_URL, ASSET_BASE_URL } from '../api/config.js';
+import kalashImage from '../assets/kalash.png';
 import { getAuthToken } from '../api/client.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
@@ -24,6 +25,8 @@ export default function ManageServices() {
   const [serviceMeta, setServiceMeta] = useState({ skip: 0, limit: 8, total: 0 });
   const [loading, setLoading] = useState(false);
   const [editingService, setEditingService] = useState(null);
+  const [createImageFile, setCreateImageFile] = useState(null);
+  const [createImagePreview, setCreateImagePreview] = useState('');
   const [editForm, setEditForm] = useState({
     name: '',
     category: '',
@@ -99,18 +102,40 @@ export default function ManageServices() {
   const addService = async (payload) => {
     try {
       const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/pandit/services`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      let response;
+      if (payload.imageFile) {
+        const formData = new FormData();
+        formData.append('name', payload.name);
+        formData.append('category', payload.category);
+        formData.append('base_price', String(payload.base_price));
+        formData.append('duration_minutes', String(payload.duration_minutes));
+        if (payload.description) {
+          formData.append('description', payload.description);
+        }
+        formData.append('file', payload.imageFile);
+        response = await fetch(`${API_BASE_URL}/pandit/services`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        });
+      } else {
+        response = await fetch(`${API_BASE_URL}/pandit/services`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+      }
 
       if (response.ok) {
         showMessage(`Service "${payload.name}" added successfully!`, 'success');
         setForm({ name: '', category: '', basePrice: '', durationMinutes: '', description: '' });
+        setCreateImageFile(null);
+        setCreateImagePreview('');
         setServiceMeta((prev) => ({ ...prev, skip: 0 }));
         loadAllServices(0);
       } else {
@@ -131,6 +156,7 @@ export default function ManageServices() {
       description: form.description || null,
       base_price: parseFloat(form.basePrice),
       duration_minutes: parseInt(form.durationMinutes, 10),
+      imageFile: createImageFile,
     });
   };
 
@@ -142,6 +168,13 @@ export default function ManageServices() {
       base_price: quickService.price,
       duration_minutes: quickService.duration,
     });
+  };
+
+  const handleCreateImageChange = (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setCreateImageFile(file);
+    setCreateImagePreview(URL.createObjectURL(file));
   };
 
   const openEditModal = (service) => {
@@ -242,11 +275,11 @@ export default function ManageServices() {
         <div className={`message ${message.type}`}>{message.text}</div>
       ) : null}
 
-      <div className="service-management">
-        <div className="add-service-section">
-          <h3>Add New Service</h3>
-          <p className="section-subtitle">Expand your offerings to reach more devotees.</p>
-          <form onSubmit={handleAddService}>
+        <div className="service-management">
+          <div className="add-service-section">
+            <h3>Add New Service</h3>
+            <p className="section-subtitle">Expand your offerings to reach more devotees.</p>
+            <form onSubmit={handleAddService}>
             <div className="form-row">
               <div className="form-group">
                 <label htmlFor="serviceName">Service Name *</label>
@@ -318,6 +351,21 @@ export default function ManageServices() {
                 onChange={handleChange('description')}
               />
             </div>
+            <div className="form-group">
+              <label htmlFor="serviceImage">Service Image (Optional)</label>
+              <input
+                id="serviceImage"
+                type="file"
+                accept=".jpg,.jpeg,.png"
+                onChange={handleCreateImageChange}
+              />
+            </div>
+            {createImagePreview ? (
+              <div
+                className="service-image-preview"
+                style={{ backgroundImage: `url(${createImagePreview})` }}
+              />
+            ) : null}
 
             <div className="form-actions">
               <button type="submit" className="btn btn-primary">
@@ -326,15 +374,17 @@ export default function ManageServices() {
               <button
                 type="button"
                 className="btn btn-secondary"
-                onClick={() =>
+                onClick={() => {
                   setForm({
                     name: '',
                     category: '',
                     basePrice: '',
                     durationMinutes: '',
                     description: '',
-                  })
-                }
+                  });
+                  setCreateImageFile(null);
+                  setCreateImagePreview('');
+                }}
               >
                 Clear Form
               </button>
@@ -343,7 +393,7 @@ export default function ManageServices() {
         </div>
 
         <div className="quick-add-section">
-          <h3>Your Active Services</h3>
+          <h3>Quick Add Services</h3>
           <p className="help-text">Tap to quickly add common services</p>
           <div className="quick-add-grid">
             {QUICK_SERVICES.map((service) => (
@@ -377,31 +427,36 @@ export default function ManageServices() {
             {!loading && services.length > 0
               ? services.map((service) => (
                   <div className="service-mini-card" key={service.id}>
-                    <div className="service-mini-icon">OM</div>
-                  <div className="service-mini-info">
-                    <h4>{service.name}</h4>
-                    <p>Category: {service.category}</p>
-                    {service.description ? (
-                      <p className="service-desc">{service.description}</p>
-                    ) : null}
-                    <div className="service-mini-meta">
-                      <span>Time {service.duration_minutes} min</span>
-                      <span>Rs {service.base_price}</span>
+                  <div
+                      className="service-mini-thumb"
+                      style={{
+                        backgroundImage: `url(${service.image_url ? `${ASSET_BASE_URL}${service.image_url}` : kalashImage})`,
+                      }}
+                    />
+                    <div className="service-mini-info">
+                      <h4>{service.name}</h4>
+                      <p>Category: {service.category}</p>
+                      {service.description ? (
+                        <p className="service-desc">{service.description}</p>
+                      ) : null}
+                      <div className="service-mini-meta">
+                        <span>Time {service.duration_minutes} min</span>
+                        <span>Rs {service.base_price}</span>
+                      </div>
+                      <div className="service-upload-row">
+                        <label className="upload-label">
+                          <input
+                            type="file"
+                            accept=".jpg,.jpeg,.png"
+                            onChange={(event) =>
+                              uploadServiceImage(service.id, event.target.files?.[0])
+                            }
+                            disabled={uploadingImage}
+                          />
+                          {uploadingImage ? 'Uploading...' : 'Upload Image'}
+                        </label>
+                      </div>
                     </div>
-                    <div className="service-upload-row">
-                      <label className="upload-label">
-                        <input
-                          type="file"
-                          accept=".jpg,.jpeg,.png"
-                          onChange={(event) =>
-                            uploadServiceImage(service.id, event.target.files?.[0])
-                          }
-                          disabled={uploadingImage}
-                        />
-                        {uploadingImage ? 'Uploading...' : 'Upload Image'}
-                      </label>
-                    </div>
-                  </div>
                     <button type="button" className="edit-pill" onClick={() => openEditModal(service)}>
                       Edit
                     </button>

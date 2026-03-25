@@ -1,18 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from models import GlobalPricing
 from schemas import GlobalPricingResponse, GlobalPricingCreate, GlobalPricingUpdate
-from auth import get_current_admin, get_current_user_or_pandit, get_db
+from auth import get_current_admin, get_current_user_or_pandit, get_db, decode_token
 
 router = APIRouter()
+
+def require_any_authenticated(authorization: str = Header(None)):
+    """Allow any valid token: user, pandit, or admin."""
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = authorization[7:] if authorization.startswith("Bearer ") else authorization
+    payload = decode_token(token)
+    if payload is None or payload.get("type") not in ("user", "pandit", "admin"):
+        raise HTTPException(status_code=401, detail="Invalid token")
+    return payload
+
 
 @router.get("/global-pricing/current", response_model=Optional[GlobalPricingResponse])
 async def get_current_global_pricing(
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user_or_pandit)
+    _auth = Depends(require_any_authenticated)
 ):
-    """Get the current active global pricing for users and pandits"""
+    """Get the current active global pricing for users, pandits, and admins"""
     pricing = (
         db.query(GlobalPricing)
         .filter(GlobalPricing.is_active == True)

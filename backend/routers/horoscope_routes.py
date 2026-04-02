@@ -1,10 +1,14 @@
-from datetime import date, datetime, timedelta
+import math
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, HTTPException
+from geopy.geocoders import Nominatim
+import pytz
 from pydantic import BaseModel, Field
+from timezonefinder import TimezoneFinder
 
-import personalized as astro
+from .engines import astro_calc, dasha_engine, llm_report, panchang_engine
 
 router = APIRouter()
 
@@ -16,6 +20,285 @@ TOPIC_PRESETS = {
     "family": "Family",
     "spiritual-growth": "Spiritual Growth",
 }
+
+PLANET_MANTRAS = {
+    "Surya (Sun)": "Om Suryaya Namah",
+    "Chandra (Moon)": "Om Somaya Namah",
+    "Mangal (Mars)": "Om Mangalaya Namah",
+    "Budh (Mercury)": "Om Budhaya Namah",
+    "Guru (Jupiter)": "Om Gurave Namah",
+    "Shukra (Venus)": "Om Shukraya Namah",
+    "Shani (Saturn)": "Om Sham Shanicharaya Namah",
+    "Rahu": "Om Rahave Namah",
+    "Ketu": "Om Ketave Namah",
+}
+
+AUSPICIOUS_NAKSHATRAS = {
+    "Rohini",
+    "Mrigashirsha",
+    "Punarvasu",
+    "Pushya",
+    "Hasta",
+    "Anuradha",
+    "Shravana",
+    "Revati",
+}
+
+_PLANET_KEY_BY_CODE = {
+    0: "Sun",
+    1: "Moon",
+    2: "Mars",
+    3: "Mercury",
+    4: "Jupiter",
+    5: "Venus",
+    6: "Saturn",
+    7: "Rahu",
+}
+
+
+def _jd_to_utc_datetime(jd: float) -> datetime:
+    return datetime.fromtimestamp((float(jd) - 2440587.5) * 86400.0, tz=timezone.utc)
+
+
+def _moon_phase_from_longs(moon_lon: float, sun_lon: float) -> Tuple[str, float, float]:
+    elong = (float(moon_lon) - float(sun_lon)) % 360.0
+    illumination = ((1 - math.cos(math.radians(elong))) / 2) * 100.0
+
+    if elong < 22.5 or elong >= 337.5:
+        phase = "New Moon"
+    elif elong < 67.5:
+        phase = "Waxing Crescent"
+    elif elong < 112.5:
+        phase = "First Quarter"
+    elif elong < 157.5:
+        phase = "Waxing Gibbous"
+    elif elong < 202.5:
+        phase = "Full Moon"
+    elif elong < 247.5:
+        phase = "Waning Gibbous"
+    elif elong < 292.5:
+        phase = "Last Quarter"
+    else:
+        phase = "Waning Crescent"
+
+    return phase, illumination, elong
+
+
+class _SWEAdapter:
+    MEAN_NODE = 999
+
+    def julday(self, year: int, month: int, day: int, hour: float) -> float:
+        hour_int = int(hour)
+        minute = int((hour - hour_int) * 60)
+        second = int(round((((hour - hour_int) * 60) - minute) * 60))
+        dt = datetime(year, month, day, hour_int, minute, second, tzinfo=timezone.utc)
+        return float(astro_calc.to_julian_day(dt))
+
+    def calc_ut(self, jd: float, code: int) -> Tuple[List[float], Any]:
+        longs = astro_calc.planet_longitudes(float(jd))
+        if code == self.MEAN_NODE:
+            lon = float(longs["Rahu"])
+        else:
+            lon = float(longs.get(_PLANET_KEY_BY_CODE.get(int(code), "Sun"), 0.0))
+        return [lon, 0.0, 0.0, 0.0], None
+
+    def houses(self, jd: float, lat: float, lon: float, _system: bytes) -> Tuple[List[float], List[float]]:
+        asc = astro_calc.ascendant(float(jd), float(lat), float(lon))
+        if asc is None:
+            asc = 0.0
+        cusps = [((float(asc) + idx * 30.0) % 360.0) for idx in range(12)]
+        return cusps, [float(asc)]
+
+
+class _AstroAdapter:
+    swe = _SWEAdapter()
+    PLANETS = {
+        "Surya (Sun)": 0,
+        "Chandra (Moon)": 1,
+        "Mangal (Mars)": 2,
+        "Budh (Mercury)": 3,
+        "Guru (Jupiter)": 4,
+        "Shukra (Venus)": 5,
+        "Shani (Saturn)": 6,
+        "Rahu": 7,
+    }
+    PLANET_MANTRAS = PLANET_MANTRAS
+    AUSPICIOUS_NAKSHATRAS = AUSPICIOUS_NAKSHATRAS
+    Nominatim = Nominatim
+    TimezoneFinder = TimezoneFinder
+    pytz = pytz
+
+    @staticmethod
+    def deg_to_rashi(longitude: float) -> Tuple[str, float]:
+        lon = float(longitude) % 360.0
+        return astro_calc.sign_name(lon), lon % 30.0
+
+    @staticmethod
+    def get_nakshatra(longitude: float) -> Tuple[str, int]:
+        lon = float(longitude) % 360.0
+        segment = 360.0 / 27.0
+        idx = int(lon // segment)
+        pada = int((lon % segment) // (segment / 4.0)) + 1
+        return astro_calc.NAKSHATRAS[idx], pada
+
+    @staticmethod
+    def get_house(longitude: float, cusps: List[float]) -> int:
+        if not cusps:
+            return 12
+        asc = float(cusps[0])
+        return int(((float(longitude) - asc) % 360.0) // 30.0) + 1
+
+    @staticmethod
+    def build_chart_context(name: str, lagna_rashi: str, lagna_deg: float, planet_data: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+        moon = planet_data.get("Chandra (Moon)", {})
+        return {
+            "name": name,
+            "lagna": f"{lagna_rashi} ({float(lagna_deg):.2f}°)",
+            "moon_sign": moon.get("rashi", "Unknown"),
+            "moon_nakshatra": moon.get("nakshatra", "Unknown"),
+            "planet_positions": planet_data,
+        }
+
+    @staticmethod
+    def derive_profile_scorecard(planet_data: Dict[str, Dict[str, Any]]) -> Tuple[int, List[str], List[str]]:
+        score = 60
+        strengths: List[str] = []
+        growth: List[str] = []
+
+        moon = planet_data.get("Chandra (Moon)", {})
+        jupiter = planet_data.get("Guru (Jupiter)", {})
+        saturn = planet_data.get("Shani (Saturn)", {})
+
+        if moon.get("house") in {1, 4, 5, 9, 10}:
+            score += 10
+            strengths.append("Emotional steadiness supports decisions")
+        else:
+            growth.append("Build routine and emotional grounding")
+
+        if jupiter.get("house") in {1, 2, 5, 9, 11}:
+            score += 10
+            strengths.append("Wisdom and mentorship energies are supportive")
+        else:
+            growth.append("Focus on learning and patient expansion")
+
+        if saturn.get("house") in {6, 8, 12}:
+            growth.append("Progress may need sustained discipline")
+        else:
+            strengths.append("Consistency and structure are on your side")
+
+        score = max(0, min(100, score))
+        if not strengths:
+            strengths = ["Balanced chart with steady potential"]
+        if not growth:
+            growth = ["Maintain consistency for best outcomes"]
+
+        return score, strengths[:3], growth[:3]
+
+    @staticmethod
+    def get_priority_planets_for_remedy(planet_data: Dict[str, Dict[str, Any]]) -> List[str]:
+        priority = []
+        for planet in ["Shani (Saturn)", "Mangal (Mars)", "Rahu", "Ketu"]:
+            house = int(planet_data.get(planet, {}).get("house", 0))
+            if house in {6, 8, 12}:
+                priority.append(planet)
+        if not priority:
+            priority = ["Chandra (Moon)", "Guru (Jupiter)"]
+        return priority[:3]
+
+    @staticmethod
+    def get_panchang_details(jd: float) -> Dict[str, Any]:
+        dt_utc = _jd_to_utc_datetime(float(jd))
+        details = panchang_engine.panchang_for_datetime(dt_utc)
+        snap = astro_calc.snapshot(float(jd))
+        diff = (snap.moon_long - snap.sun_long) % 360.0
+        tithi_number = int(diff // 12.0) + 1
+        paksha = "Shukla" if tithi_number <= 15 else "Krishna"
+        segment = 360.0 / 27.0
+        pada = int((snap.moon_long % segment) // (segment / 4.0)) + 1
+        return {
+            "tithi_number": tithi_number,
+            "tithi_name": details["tithi"],
+            "paksha": paksha,
+            "nakshatra": details["nakshatra"],
+            "pada": pada,
+            "yoga": details["yoga"],
+            "karana": details["karana"],
+            "moon_lon": snap.moon_long,
+            "sun_lon": snap.sun_long,
+        }
+
+    @staticmethod
+    def get_vrat_festival_tags(tithi_number: int, paksha: str) -> List[str]:
+        tags: List[str] = []
+        if int(tithi_number) in {11, 26}:
+            tags.append("Ekadashi")
+        if int(tithi_number) in {13, 28}:
+            tags.append("Pradosh")
+        if int(tithi_number) in {15, 30}:
+            tags.append("Purnima/Amavasya")
+        if str(paksha) == "Shukla" and int(tithi_number) == 9:
+            tags.append("Navami")
+        return tags
+
+    @staticmethod
+    def get_moon_phase_details(moon_lon: float, sun_lon: float) -> Tuple[str, float, float]:
+        return _moon_phase_from_longs(float(moon_lon), float(sun_lon))
+
+    @staticmethod
+    def get_current_vimshottari(now_local: datetime, birth_local: datetime, moon_lon_birth: float) -> Tuple[str, float, float, int, float]:
+        maha = dasha_engine.current_mahadasha(birth_local, float(moon_lon_birth), now_local)
+        lord = str(maha["mahadasha"])
+        elapsed_maha_years = float(maha.get("elapsed_days", 0.0)) / 365.25
+        total_maha_years = float(maha.get("total_days", 0.0)) / 365.25
+        cycle_index = dasha_engine.VIMSHOTTARI_ORDER.index(lord)
+        elapsed_years = (now_local - birth_local).total_seconds() / (86400.0 * 365.25)
+        return lord, elapsed_maha_years, total_maha_years, cycle_index, elapsed_years
+
+    @staticmethod
+    def get_antardasha(maha_lord: str, elapsed_maha_years: float) -> Tuple[str, float, float]:
+        total_maha_days = dasha_engine.VIMSHOTTARI_YEARS.get(str(maha_lord), 0) * 365.25
+        payload = {
+            "mahadasha": str(maha_lord),
+            "elapsed_days": float(elapsed_maha_years) * 365.25,
+            "total_days": float(total_maha_days),
+        }
+        antar = dasha_engine.current_antardasha(payload, datetime.utcnow())
+        antar_lord = str(antar.get("antardasha", "Unknown"))
+        total_antar_years = (dasha_engine.VIMSHOTTARI_YEARS.get(antar_lord, 0) / 120.0) * (
+            float(total_maha_days) / 365.25
+        )
+        remaining_antar_years = float(antar.get("remaining_months", 0.0)) / 12.0
+        elapsed_antar_years = max(0.0, float(total_antar_years) - remaining_antar_years)
+        return antar_lord, elapsed_antar_years, float(total_antar_years)
+
+    @staticmethod
+    def generate_personalized_text(topic: str, chart_context: Dict[str, Any]) -> str:
+        report = {
+            "topic": topic,
+            "chart_context": chart_context,
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+        }
+        llm_result = llm_report.generate_llm_report(report)
+        if llm_result.get("error"):
+            raise RuntimeError(str(llm_result["error"]))
+        html = str(llm_result.get("html", "")).strip()
+        if not html:
+            raise RuntimeError("LLM returned empty response")
+        return html
+
+    @staticmethod
+    def get_fallback_text(topic: str, chart_context: Dict[str, Any]) -> str:
+        lagna = chart_context.get("lagna", "Unknown")
+        moon_sign = chart_context.get("moon_sign", "Unknown")
+        moon_nak = chart_context.get("moon_nakshatra", "Unknown")
+        return (
+            f"Topic: {topic}. Current guidance based on your chart points to steady effort and calm execution. "
+            f"Lagna: {lagna}, Moon sign: {moon_sign}, Nakshatra: {moon_nak}. "
+            "Prioritize focused action, avoid impulsive decisions, and keep routines stable for better outcomes."
+        )
+
+
+astro = _AstroAdapter()
 
 
 class BirthBaseRequest(BaseModel):

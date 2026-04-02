@@ -663,7 +663,7 @@ def get_fallback_text(topic, chart_context):
 def generate_personalized_text(topic, chart_context):
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if not api_key:
-        return "⚠️ Gemini API key missing. Set GEMINI_API_KEY (or GOOGLE_API_KEY) to enable AI personalized content."
+        raise RuntimeError("Gemini API key missing. Set GEMINI_API_KEY (or GOOGLE_API_KEY).")
 
     system_prompt = (
         "You are an elite Vedic astrology counselor who writes warm, insightful, and practical guidance. "
@@ -688,27 +688,23 @@ Chart data:
 {chart_context}
 """
 
-    try:
-        for _ in range(2):
-            response = completion(
-                model=GEMINI_MODEL,
-                api_key=api_key,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.7,
-                max_tokens=500
-            )
-            content = response.choices[0].message.content or ""
-            content = clean_ai_text(content)
-            if len(content.split()) >= 90 and content.count("\n") >= 4:
-                return content
+    for _ in range(3):
+        response = completion(
+            model=GEMINI_MODEL,
+            api_key=api_key,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.75,
+            max_tokens=650
+        )
+        content = response.choices[0].message.content or ""
+        content = clean_ai_text(content)
+        if len(content.split()) >= 90 and content.count("\n") >= 4:
+            return content
 
-        return get_fallback_text(topic, chart_context)
-    except Exception as exc:
-        fallback = get_fallback_text(topic, chart_context)
-        return f"⚠️ AI generation failed: {exc}\n\n{fallback}"
+    raise RuntimeError("LLM response quality check failed. Please retry.")
 
 # =======================
 # USER INPUT

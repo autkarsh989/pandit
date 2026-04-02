@@ -8,6 +8,15 @@ import personalized as astro
 
 router = APIRouter()
 
+TOPIC_PRESETS = {
+    "career": "Career",
+    "marriage": "Marriage",
+    "finance": "Finance",
+    "health": "Health",
+    "family": "Family",
+    "spiritual-growth": "Spiritual Growth",
+}
+
 
 class BirthBaseRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=120, description="Full name")
@@ -18,12 +27,32 @@ class BirthBaseRequest(BaseModel):
 
 class HoroscopeRequest(BirthBaseRequest):
     topic: str = Field(default="daily horoscope", max_length=120, description="Guidance topic for personalized reading")
+    topic_preset: Optional[str] = Field(
+        default=None,
+        max_length=40,
+        description="Optional preset key like career, marriage, finance, health, family, spiritual-growth",
+    )
+    custom_topic: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Optional custom guidance topic typed by the user",
+    )
     include_ai_reading: bool = Field(default=True, description="Generate AI reading when API key is configured")
     alert_days: int = Field(default=7, ge=1, le=60, description="How many days of upcoming vrat/festival alerts")
 
 
 class ReadingRequest(BirthBaseRequest):
     topic: str = Field(default="daily horoscope", max_length=120, description="Guidance topic for personalized reading")
+    topic_preset: Optional[str] = Field(
+        default=None,
+        max_length=40,
+        description="Optional preset key like career, marriage, finance, health, family, spiritual-growth",
+    )
+    custom_topic: Optional[str] = Field(
+        default=None,
+        max_length=120,
+        description="Optional custom guidance topic typed by the user",
+    )
     include_ai_reading: bool = Field(default=True, description="Generate AI reading when API key is configured")
 
 
@@ -296,6 +325,24 @@ def _location_payload(location: Any, timezone_name: str) -> Dict[str, Any]:
     }
 
 
+def _resolve_guidance_topic(topic: Optional[str], topic_preset: Optional[str], custom_topic: Optional[str]) -> str:
+    typed_topic = (custom_topic or "").strip()
+    if typed_topic:
+        return typed_topic
+
+    preset_key = (topic_preset or "").strip().lower()
+    if preset_key:
+        if preset_key not in TOPIC_PRESETS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid topic_preset '{topic_preset}'. Allowed values: {', '.join(TOPIC_PRESETS.keys())}",
+            )
+        return TOPIC_PRESETS[preset_key]
+
+    fallback_topic = (topic or "").strip()
+    return fallback_topic or "daily guidance for my day"
+
+
 @router.get("/predict")
 def predict_info() -> Dict[str, Any]:
     return {
@@ -315,9 +362,23 @@ def predict_info() -> Dict[str, Any]:
     }
 
 
+@router.get("/topics")
+def get_guidance_topics() -> Dict[str, Any]:
+    return {
+        "presets": [{"key": key, "label": label} for key, label in TOPIC_PRESETS.items()],
+        "allow_custom_topic": True,
+        "custom_topic_max_length": 120,
+        "usage": {
+            "priority": ["custom_topic", "topic_preset", "topic"],
+            "note": "If custom_topic is provided, it takes precedence over topic_preset and topic.",
+        },
+    }
+
+
 @router.post("/predict")
 def predict_horoscope(payload: HoroscopeRequest) -> Dict[str, Any]:
     bundle = _compute_birth_bundle(payload)
+    guidance_topic = _resolve_guidance_topic(payload.topic, payload.topic_preset, payload.custom_topic)
 
     score, strengths, growth = astro.derive_profile_scorecard(bundle["planet_data"])
     remedy_planets = astro.get_priority_planets_for_remedy(bundle["planet_data"])
@@ -337,9 +398,12 @@ def predict_horoscope(payload: HoroscopeRequest) -> Dict[str, Any]:
     transit_snapshot = _build_transit_snapshot(bundle["planet_data"], jd_now)
 
     if payload.include_ai_reading:
-        personalized_reading = astro.generate_personalized_text(payload.topic, bundle["chart_context"])
+        try:
+            personalized_reading = astro.generate_personalized_text(guidance_topic, bundle["chart_context"])
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"AI reading unavailable: {exc}")
     else:
-        personalized_reading = astro.get_fallback_text(payload.topic, bundle["chart_context"])
+        personalized_reading = astro.get_fallback_text(guidance_topic, bundle["chart_context"])
 
     upcoming_alerts = _collect_vrat_alerts(payload.alert_days, bundle["timezone_obj"])
     shubh_muhurats = _collect_shubh_muhurats(min(payload.alert_days, 14), bundle["timezone_obj"])
@@ -350,7 +414,8 @@ def predict_horoscope(payload: HoroscopeRequest) -> Dict[str, Any]:
             "dob": payload.dob,
             "tob": payload.tob,
             "place": payload.place,
-            "topic": payload.topic,
+            "topic": guidance_topic,
+            "topic_preset": payload.topic_preset,
         },
         "location": _location_payload(bundle["location"], bundle["timezone_name"]),
         "lagna": {
@@ -381,7 +446,7 @@ def predict_horoscope(payload: HoroscopeRequest) -> Dict[str, Any]:
         "upcoming_vrat_alerts": upcoming_alerts,
         "shubh_muhurat_windows": shubh_muhurats,
         "reading": {
-            "topic": payload.topic,
+            "topic": guidance_topic,
             "ai_enabled": payload.include_ai_reading,
             "text": personalized_reading,
         },
@@ -536,12 +601,16 @@ def get_shubh_muhurat(payload: MuhuratRequest) -> Dict[str, Any]:
 @router.post("/reading")
 def get_personalized_reading(payload: ReadingRequest) -> Dict[str, Any]:
     bundle = _compute_birth_bundle(payload)
+    guidance_topic = _resolve_guidance_topic(payload.topic, payload.topic_preset, payload.custom_topic)
     score, strengths, growth = astro.derive_profile_scorecard(bundle["planet_data"])
 
     if payload.include_ai_reading:
-        reading_text = astro.generate_personalized_text(payload.topic, bundle["chart_context"])
+        try:
+            reading_text = astro.generate_personalized_text(guidance_topic, bundle["chart_context"])
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail=f"AI reading unavailable: {exc}")
     else:
-        reading_text = astro.get_fallback_text(payload.topic, bundle["chart_context"])
+        reading_text = astro.get_fallback_text(guidance_topic, bundle["chart_context"])
 
     return {
         "input": {
@@ -549,7 +618,8 @@ def get_personalized_reading(payload: ReadingRequest) -> Dict[str, Any]:
             "dob": payload.dob,
             "tob": payload.tob,
             "place": payload.place,
-            "topic": payload.topic,
+            "topic": guidance_topic,
+            "topic_preset": payload.topic_preset,
         },
         "location": _location_payload(bundle["location"], bundle["timezone_name"]),
         "scorecard": {
@@ -558,7 +628,7 @@ def get_personalized_reading(payload: ReadingRequest) -> Dict[str, Any]:
             "growth_areas": growth,
         },
         "reading": {
-            "topic": payload.topic,
+            "topic": guidance_topic,
             "ai_enabled": payload.include_ai_reading,
             "text": reading_text,
         },

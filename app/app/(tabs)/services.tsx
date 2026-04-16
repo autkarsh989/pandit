@@ -17,6 +17,7 @@ import { apiGet, apiPost } from '@/lib/api';
 import { ASSET_BASE_URL } from '@/lib/config';
 import { useAuth } from '@/context/AuthContext';
 import { router } from 'expo-router';
+import { createBookingWithPayment } from '@/lib/bookingPayments';
 
 type Service = {
   id: string;
@@ -57,6 +58,7 @@ export default function ServicesScreen() {
   const [showModal, setShowModal] = useState(false);
   const [specialOffers, setSpecialOffers] = useState<SpecialOffer[]>([]);
   const [globalPricing, setGlobalPricing] = useState<GlobalPricing | null>(null);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -136,9 +138,9 @@ export default function ServicesScreen() {
 
   const confirmBooking = async () => {
     if (!selected || !token) return;
+    setBookingSubmitting(true);
     try {
-      await apiPost(
-        '/user/bookings',
+      await createBookingWithPayment(
         {
           pandit_id: selected.pandit_id,
           service_id: selected.id,
@@ -151,6 +153,8 @@ export default function ServicesScreen() {
       router.push('/(tabs)/bookings');
     } catch (error) {
       console.error('Create booking error', error);
+    } finally {
+      setBookingSubmitting(false);
     }
   };
 
@@ -328,7 +332,11 @@ export default function ServicesScreen() {
             />
             <View style={styles.modalActions}>
               <AppButton title="Cancel" variant="secondary" onPress={() => setShowModal(false)} />
-              <AppButton title="Confirm" onPress={confirmBooking} />
+              <AppButton
+                title={bookingSubmitting ? 'Processing...' : 'Pay & Book'}
+                onPress={confirmBooking}
+                disabled={bookingSubmitting}
+              />
             </View>
           </View>
         </View>

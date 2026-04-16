@@ -173,6 +173,12 @@ class BookingResponse(BaseModel):
     service_location_name: Optional[str]
     status: str
     total_amount: float
+    payment_status: Optional[str] = None
+    payment_amount: Optional[float] = None
+    payment_currency: Optional[str] = None
+    razorpay_order_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
+    paid_at: Optional[datetime] = None
     service_name: Optional[str] = None
     pandit_name: Optional[str] = None
     user_name: Optional[str] = None
@@ -181,6 +187,13 @@ class BookingResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class RazorpayVerification(BaseModel):
+    booking_id: str
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
 
 class BookingStatusUpdate(BaseModel):
     status: str  # confirmed, rejected, completed, cancelled

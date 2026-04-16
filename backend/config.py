@@ -10,6 +10,11 @@ SECRET_KEY = "supersecretkey"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
+# Razorpay configuration
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "").strip()
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "").strip()
+RAZORPAY_CURRENCY = os.getenv("RAZORPAY_CURRENCY", "INR").strip() or "INR"
+
 # File upload configuration
 UPLOAD_DIR = "uploads"
 PROFILE_PICTURES_DIR = os.path.join(UPLOAD_DIR, "profile_pictures")

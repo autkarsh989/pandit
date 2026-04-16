@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { API_BASE_URL, ASSET_BASE_URL } from '../api/config.js';
 import kalashImage from '../assets/kalash.png';
 import { getAuthToken } from '../api/client.js';
+import { createBooking, startRazorpayCheckout } from '../api/bookings.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
 export default function PanditPortal() {
@@ -16,6 +17,7 @@ export default function PanditPortal() {
   const [bookingServiceId, setBookingServiceId] = useState('');
   const [bookingDate, setBookingDate] = useState('');
   const [serviceAddress, setServiceAddress] = useState('');
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
 
   useEffect(() => {
     loadPandit();
@@ -79,32 +81,38 @@ export default function PanditPortal() {
       return;
     }
 
+    setBookingSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/user/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          pandit_id: panditId,
-          service_id: bookingServiceId,
-          booking_date: bookingDate,
-          service_address: serviceAddress,
-        }),
+      const response = await createBooking({
+        pandit_id: panditId,
+        service_id: bookingServiceId,
+        booking_date: bookingDate,
+        service_address: serviceAddress,
       });
 
-      if (response.ok) {
-        showMessage('Booking created successfully!', 'success');
-        setShowBookingModal(false);
-        setTimeout(() => navigate('/bookings'), 1000);
+      if (response.payment_required && response.payment) {
+        const checkoutResult = await startRazorpayCheckout({
+          bookingId: response.booking_id,
+          payment: response.payment,
+          token,
+          returnUrl: `${window.location.origin}/bookings`,
+          description: pandit?.full_name || 'Pandit consultation',
+        });
+
+        if (checkoutResult.verified) {
+          showMessage('Payment completed successfully!', 'success');
+        }
       } else {
-        const error = await response.json();
-        showMessage(error.detail || 'Error creating booking', 'error');
+        showMessage('Booking created successfully!', 'success');
       }
+
+      setShowBookingModal(false);
+      setTimeout(() => navigate('/bookings'), 1200);
     } catch (error) {
-      showMessage('Error creating booking', 'error');
+      showMessage(error.message || 'Error creating booking', 'error');
       console.error('Create booking error:', error);
+    } finally {
+      setBookingSubmitting(false);
     }
   };
 
@@ -342,8 +350,8 @@ export default function PanditPortal() {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary">
-              Confirm Booking
+            <button type="submit" className="btn btn-primary" disabled={bookingSubmitting}>
+              {bookingSubmitting ? 'Processing Payment...' : 'Pay & Book'}
             </button>
           </form>
         </div>

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL, ASSET_BASE_URL } from '../api/config.js';
 import kalashImage from '../assets/kalash.png';
 import { getAuthToken } from '../api/client.js';
+import { createBooking, startRazorpayCheckout } from '../api/bookings.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
 export default function Services() {
@@ -19,6 +20,7 @@ export default function Services() {
   const [serviceAddress, setServiceAddress] = useState('');
   const [specialOffers, setSpecialOffers] = useState([]);
   const [globalPricing, setGlobalPricing] = useState(null);
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
 
   useEffect(() => {
     loadServices();
@@ -123,32 +125,38 @@ export default function Services() {
       return;
     }
 
+    setBookingSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/user/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          pandit_id: selectedService.pandit_id,
-          service_id: selectedService.id,
-          booking_date: bookingDate,
-          service_address: serviceAddress,
-        }),
+      const response = await createBooking({
+        pandit_id: selectedService.pandit_id,
+        service_id: selectedService.id,
+        booking_date: bookingDate,
+        service_address: serviceAddress,
       });
 
-      if (response.ok) {
-        showMessage('Booking created successfully!', 'success');
-        setShowBookingModal(false);
-        setTimeout(() => navigate('/bookings'), 1500);
+      if (response.payment_required && response.payment) {
+        const checkoutResult = await startRazorpayCheckout({
+          bookingId: response.booking_id,
+          payment: response.payment,
+          token,
+          returnUrl: `${window.location.origin}/bookings`,
+          description: selectedService.name,
+        });
+
+        if (checkoutResult.verified) {
+          showMessage('Payment completed successfully!', 'success');
+        }
       } else {
-        const error = await response.json();
-        showMessage(error.detail || 'Error creating booking', 'error');
+        showMessage('Booking created successfully!', 'success');
       }
+
+      setShowBookingModal(false);
+      setTimeout(() => navigate('/bookings'), 1200);
     } catch (error) {
-      showMessage('Error creating booking', 'error');
+      showMessage(error.message || 'Error creating booking', 'error');
       console.error('Create booking error:', error);
+    } finally {
+      setBookingSubmitting(false);
     }
   };
 
@@ -399,8 +407,8 @@ export default function Services() {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary">
-              Confirm Booking
+            <button type="submit" className="btn btn-primary" disabled={bookingSubmitting}>
+              {bookingSubmitting ? 'Processing Payment...' : 'Pay & Book'}
             </button>
           </form>
         </div>

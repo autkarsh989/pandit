@@ -6,6 +6,7 @@ import Tag from '@/components/Tag';
 import AppButton from '@/components/AppButton';
 import { colors, fonts, radius, shadow, spacing } from '@/constants/theme';
 import { apiGet, apiPut, apiPost } from '@/lib/api';
+import { createBookingWithPayment } from '@/lib/bookingPayments';
 import { useAuth } from '@/context/AuthContext';
 import { router } from 'expo-router';
 
@@ -51,6 +52,7 @@ export default function PanditsScreen() {
   const [bookingServiceId, setBookingServiceId] = useState('');
   const [bookingDate, setBookingDate] = useState('');
   const [serviceAddress, setServiceAddress] = useState('');
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
 
   useEffect(() => {
     if (!ready) return;
@@ -126,9 +128,9 @@ export default function PanditsScreen() {
 
   const createBooking = async () => {
     if (!token || !selectedPanditId) return;
+    setBookingSubmitting(true);
     try {
-      await apiPost(
-        '/user/bookings',
+      await createBookingWithPayment(
         {
           pandit_id: selectedPanditId,
           service_id: bookingServiceId,
@@ -141,6 +143,8 @@ export default function PanditsScreen() {
       router.push('/(tabs)/bookings');
     } catch (error) {
       console.error('Create booking error', error);
+    } finally {
+      setBookingSubmitting(false);
     }
   };
 
@@ -329,7 +333,11 @@ export default function PanditsScreen() {
             />
             <View style={styles.modalActions}>
               <AppButton title="Cancel" variant="secondary" onPress={() => setShowBookingModal(false)} />
-              <AppButton title="Confirm Booking" onPress={createBooking} />
+              <AppButton
+                title={bookingSubmitting ? 'Processing...' : 'Pay & Book'}
+                onPress={createBooking}
+                disabled={bookingSubmitting}
+              />
             </View>
           </View>
         </View>

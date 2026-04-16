@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../api/config.js';
 import { getAuthToken, getUserType } from '../api/client.js';
+import { buildCheckoutUrl } from '../api/bookings.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
 export default function Bookings() {
@@ -18,6 +19,7 @@ export default function Bookings() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [bookingDetail, setBookingDetail] = useState(null);
+  const [payingBookingId, setPayingBookingId] = useState('');
   const userType = getUserType();
   const isPandit = userType === 'pandit';
 
@@ -99,6 +101,34 @@ export default function Bookings() {
       setShowDetailModal(false);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  const payForBooking = (booking) => {
+    const token = getAuthToken();
+    if (!token) {
+      showMessage('Please login again.', 'error');
+      navigate('/');
+      return;
+    }
+
+    setPayingBookingId(booking.id);
+    try {
+      const checkoutUrl = buildCheckoutUrl(
+        `${API_BASE_URL}/user/bookings/${booking.id}/payment/checkout`,
+        `${window.location.origin}/bookings`
+      );
+      const popup = window.open(checkoutUrl, '_blank', 'noopener,noreferrer');
+      if (!popup) {
+        window.location.assign(checkoutUrl);
+      } else {
+        showMessage('Continue payment in the opened checkout window.', 'success');
+      }
+    } catch (error) {
+      showMessage('Unable to open payment checkout', 'error');
+      console.error('Pay booking error:', error);
+    } finally {
+      setPayingBookingId('');
     }
   };
 
@@ -310,6 +340,11 @@ export default function Bookings() {
                       <span className={`status-badge status-${booking.status}`}>
                         {booking.status}
                       </span>
+                      {booking.payment_status && booking.payment_status !== 'paid' && booking.payment_status !== 'not_required' ? (
+                        <span className="status-badge status-pending">
+                          payment {booking.payment_status}
+                        </span>
+                      ) : null}
                       <span className="booking-id">Order ID: #{booking.id.substring(0, 8)}</span>
                     </div>
                     <h3>{booking.service_name || `Booking #${booking.id.substring(0, 8)}`}</h3>
@@ -329,6 +364,16 @@ export default function Bookings() {
                         onClick={() => openReviewModal(booking.id)}
                       >
                         Leave Review
+                      </button>
+                    ) : null}
+                    {!isPandit && booking.payment_status && booking.payment_status !== 'paid' && booking.payment_status !== 'not_required' ? (
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        onClick={() => payForBooking(booking)}
+                        disabled={payingBookingId === booking.id}
+                      >
+                        {payingBookingId === booking.id ? 'Opening Checkout...' : 'Pay Now'}
                       </button>
                     ) : null}
                     {isPandit ? (
@@ -528,6 +573,9 @@ export default function Bookings() {
               </p>
               <p>
                 <strong>Status:</strong> {bookingDetail.status}
+              </p>
+              <p>
+                <strong>Payment Status:</strong> {bookingDetail.payment_status || 'pending'}
               </p>
               <p>
                 <strong>Amount:</strong> Rs {bookingDetail.total_amount}

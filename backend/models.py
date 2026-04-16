@@ -87,6 +87,13 @@ class Booking(Base):
     service_location_name = Column(String, nullable=True)  # e.g., "Ram Mandir", "Home", "Wedding Hall"
     status = Column(String, default="pending", index=True)  # pending, confirmed, rejected, completed, cancelled
     total_amount = Column(Float)
+    payment_status = Column(String, default="pending", index=True)  # pending, paid, failed, refunded, not_required
+    payment_amount = Column(Float, nullable=True)
+    payment_currency = Column(String, default="INR")
+    razorpay_order_id = Column(String(64), nullable=True, index=True)
+    razorpay_payment_id = Column(String(64), nullable=True, index=True)
+    razorpay_signature = Column(String(255), nullable=True)
+    paid_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

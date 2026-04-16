@@ -1,10 +1,21 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+import json
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Request, Header
+from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import or_, func
 from typing import Optional
 import models, schemas
-from auth import get_current_user, get_db
+from auth import get_current_user, get_db, decode_token
+import config
+from payment_utils import (
+    calculate_booking_amount,
+    create_razorpay_order,
+    has_razorpay_credentials,
+    verify_razorpay_signature,
+)
 from utils import calculate_distance, calculate_match_score, save_profile_picture, delete_profile_picture
 
 router = APIRouter()
@@ -467,6 +478,7 @@ def user_dashboard(
 @router.post("/user/bookings")
 def create_booking(
     booking: schemas.BookingCreate,
+    request: Request,
     db: Session = Depends(get_db),
     user=Depends(get_current_user)
 ):
@@ -485,6 +497,8 @@ def create_booking(
     
     if service.pandit_id != booking.pandit_id:
         raise HTTPException(status_code=400, detail="Service not offered by this pandit")
+
+    payable_amount = calculate_booking_amount(db, service.base_price)
     
     new_booking = models.Booking(
         user_id=user.id,
@@ -495,13 +509,56 @@ def create_booking(
         service_latitude=booking.service_latitude,
         service_longitude=booking.service_longitude,
         service_location_name=booking.service_location_name,
-        total_amount=service.base_price,
-        status="pending"
+        total_amount=payable_amount,
+        payment_amount=payable_amount,
+        payment_currency="INR",
+        status="pending",
+        payment_status="pending",
     )
     db.add(new_booking)
+    db.flush()
+
+    payment_payload = {
+        "payment_required": False,
+        "payment": None,
+    }
+
+    if has_razorpay_credentials():
+        receipt_id = f"b_{new_booking.id.replace('-', '')}"
+        order = create_razorpay_order(
+            payable_amount,
+            receipt=receipt_id,
+            notes={
+                "booking_id": new_booking.id,
+                "user_id": user.id,
+                "pandit_id": booking.pandit_id,
+                "service_id": booking.service_id,
+            },
+        )
+        new_booking.razorpay_order_id = order.get("id")
+        new_booking.payment_status = "pending"
+        payment_payload = {
+            "payment_required": True,
+            "payment": {
+                "provider": "razorpay",
+                "key_id": config.RAZORPAY_KEY_ID,
+                "order_id": order.get("id"),
+                "amount": order.get("amount"),
+                "currency": order.get("currency", "INR"),
+                "checkout_url": str(request.url_for("razorpay_checkout_page", booking_id=new_booking.id)),
+            },
+        }
+    else:
+        new_booking.payment_status = "not_required"
+
     db.commit()
     db.refresh(new_booking)
-    return {"msg": "Booking created successfully", "booking_id": str(new_booking.id)}
+
+    return {
+        "msg": "Booking created successfully",
+        "booking_id": str(new_booking.id),
+        **payment_payload,
+    }
 
 # View my bookings
 @router.get("/user/bookings", response_model=list[schemas.BookingResponse])
@@ -549,6 +606,12 @@ def view_my_bookings(
             "service_location_name": booking.service_location_name,
             "status": booking.status,
             "total_amount": booking.total_amount,
+            "payment_status": booking.payment_status,
+            "payment_amount": booking.payment_amount,
+            "payment_currency": booking.payment_currency,
+            "razorpay_order_id": booking.razorpay_order_id,
+            "razorpay_payment_id": booking.razorpay_payment_id,
+            "paid_at": booking.paid_at,
             "service_name": service_name,
             "pandit_name": pandit_name,
             "reviewed_by_user": booking.id in reviewed_ids,
@@ -601,10 +664,220 @@ def view_booking_detail(
         "service_location_name": booking.service_location_name,
         "status": booking.status,
         "total_amount": booking.total_amount,
+        "payment_status": booking.payment_status,
+        "payment_amount": booking.payment_amount,
+        "payment_currency": booking.payment_currency,
+        "razorpay_order_id": booking.razorpay_order_id,
+        "razorpay_payment_id": booking.razorpay_payment_id,
+        "paid_at": booking.paid_at,
         "service_name": service_name,
         "pandit_name": pandit_name,
         "reviewed_by_user": reviewed,
     }
+
+
+@router.post("/user/bookings/{booking_id}/payment/verify")
+def verify_booking_payment(
+    booking_id: str,
+    payload: schemas.RazorpayVerification,
+    authorization: Optional[str] = Header(None),
+    db: Session = Depends(get_db),
+):
+    booking = db.query(models.Booking).filter(models.Booking.id == booking_id).first()
+
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    if authorization:
+        token = authorization[7:] if authorization.startswith("Bearer ") else authorization
+        payload_data = decode_token(token)
+        if payload_data and payload_data.get("type") == "user":
+            if booking.user_id != payload_data.get("sub"):
+                raise HTTPException(status_code=403, detail="You cannot verify this booking")
+
+    if booking.payment_status == "paid":
+        return {"msg": "Payment already verified", "booking_id": booking.id, "payment_status": booking.payment_status}
+
+    if booking.razorpay_order_id and booking.razorpay_order_id != payload.razorpay_order_id:
+        raise HTTPException(status_code=400, detail="Payment order does not match this booking")
+
+    if not verify_razorpay_signature(
+        payload.razorpay_order_id,
+        payload.razorpay_payment_id,
+        payload.razorpay_signature,
+    ):
+        booking.payment_status = "failed"
+        booking.razorpay_payment_id = payload.razorpay_payment_id
+        booking.razorpay_signature = payload.razorpay_signature
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid payment signature")
+
+    booking.payment_status = "paid"
+    booking.razorpay_order_id = payload.razorpay_order_id
+    booking.razorpay_payment_id = payload.razorpay_payment_id
+    booking.razorpay_signature = payload.razorpay_signature
+    booking.paid_at = datetime.utcnow()
+    db.commit()
+    db.refresh(booking)
+
+    return {
+        "msg": "Payment verified successfully",
+        "booking_id": booking.id,
+        "payment_status": booking.payment_status,
+    }
+
+
+@router.get("/user/bookings/{booking_id}/payment/checkout", response_class=HTMLResponse)
+def razorpay_checkout_page(
+    booking_id: str,
+    request: Request,
+    return_url: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    booking = db.query(models.Booking).filter(models.Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    service = db.query(models.Service).filter(models.Service.id == booking.service_id).first()
+    if not service:
+        raise HTTPException(status_code=404, detail="Service not found")
+
+    if booking.payment_status == "paid":
+        redirect_target = return_url or "/bookings"
+        return HTMLResponse(
+            f"""
+            <!doctype html>
+            <html>
+                <head><meta charset='utf-8'><title>Payment complete</title></head>
+                <body style='font-family:Arial,sans-serif;padding:32px;'>
+                    <h2>Payment already completed</h2>
+                    <p>This booking has already been paid.</p>
+                    <p><a href='{redirect_target}'>Continue</a></p>
+                </body>
+            </html>
+            """
+        )
+
+    if not booking.razorpay_order_id:
+        raise HTTPException(status_code=400, detail="Payment order is not available for this booking")
+
+    checkout_data = {
+        "bookingId": booking.id,
+        "orderId": booking.razorpay_order_id,
+        "amount": int(round((booking.payment_amount or booking.total_amount or service.base_price) * 100)),
+        "currency": booking.payment_currency or "INR",
+        "keyId": config.RAZORPAY_KEY_ID,
+        "serviceName": service.name,
+        "userName": None,
+        "returnUrl": return_url or request.headers.get("referer") or str(request.base_url),
+        "verifyUrl": str(request.url_for("verify_booking_payment", booking_id=booking.id)),
+    }
+
+    checkout_json = json.dumps(checkout_data)
+    return HTMLResponse(
+        f"""
+                <!doctype html>
+                <html>
+                    <head>
+                        <meta charset='utf-8' />
+                        <meta name='viewport' content='width=device-width, initial-scale=1' />
+                        <title>Secure Checkout</title>
+                        <script src='https://checkout.razorpay.com/v1/checkout.js'></script>
+                        <style>
+                            body {{ font-family: Inter, Arial, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f7f2ea; color: #2b1d14; }}
+                            .card {{ width: min(92vw, 420px); background: #fff; border-radius: 20px; padding: 28px; box-shadow: 0 18px 50px rgba(66, 36, 11, 0.12); }}
+                            .price {{ font-size: 28px; font-weight: 700; margin: 6px 0 18px; }}
+                            button, a {{ display: inline-block; border: 0; border-radius: 12px; padding: 12px 18px; text-decoration: none; cursor: pointer; font-weight: 600; }}
+                            .primary {{ background: #c75f23; color: #fff; }}
+                            .secondary {{ background: #f0e7db; color: #5a4635; }}
+                            .muted {{ color: #6f6258; font-size: 14px; }}
+                            .error {{ color: #b42318; margin-top: 14px; white-space: pre-wrap; }}
+                        </style>
+                    </head>
+                    <body>
+                        <div class='card'>
+                            <div class='muted'>Secure payment powered by Razorpay</div>
+                            <h1 style='margin: 8px 0 0;'>{service.name}</h1>
+                            <div class='price'>Rs {booking.payment_amount or booking.total_amount or service.base_price}</div>
+                            <p class='muted'>Complete the payment to confirm your booking.</p>
+                            <button id='payBtn' class='primary'>Pay now</button>
+                            <a id='returnLink' class='secondary' href='{checkout_data["returnUrl"]}' style='margin-left: 10px;'>Return</a>
+                            <div id='error' class='error' style='display:none;'></div>
+                        </div>
+                        <script>
+                            const checkoutData = {checkout_json};
+                            const errorNode = document.getElementById('error');
+                            const payButton = document.getElementById('payBtn');
+                            const returnLink = document.getElementById('returnLink');
+
+                            function showError(message) {{
+                                errorNode.textContent = message;
+                                errorNode.style.display = 'block';
+                            }}
+
+                            function redirectAfterSuccess() {{
+                                window.location.href = checkoutData.returnUrl;
+                            }}
+
+                            payButton.addEventListener('click', () => {{
+                                if (!window.Razorpay) {{
+                                    showError('Razorpay checkout failed to load. Please refresh and try again.');
+                                    return;
+                                }}
+
+                                const options = {{
+                                    key: checkoutData.keyId,
+                                    amount: checkoutData.amount,
+                                    currency: checkoutData.currency,
+                                    name: 'Pandit Booking',
+                                    description: checkoutData.serviceName,
+                                    order_id: checkoutData.orderId,
+                                    handler: async function (response) {{
+                                        try {{
+                                            const verifyResponse = await fetch(checkoutData.verifyUrl, {{
+                                                method: 'POST',
+                                                headers: {{ 'Content-Type': 'application/json' }},
+                                                body: JSON.stringify({{
+                                                    booking_id: checkoutData.bookingId,
+                                                    razorpay_order_id: response.razorpay_order_id,
+                                                    razorpay_payment_id: response.razorpay_payment_id,
+                                                    razorpay_signature: response.razorpay_signature,
+                                                }}),
+                                            }});
+                                            if (!verifyResponse.ok) {{
+                                                const payload = await verifyResponse.json().catch(() => ({{}}));
+                                                throw new Error(payload.detail || 'Payment verification failed');
+                                            }}
+                                            redirectAfterSuccess();
+                                        }} catch (error) {{
+                                            showError(error.message || 'Payment verification failed');
+                                        }}
+                                    }},
+                                    modal: {{
+                                        ondismiss: function () {{
+                                            showError('Payment window closed. You can reopen it using the Pay now button.');
+                                        }},
+                                    }},
+                                    theme: {{
+                                        color: '#c75f23',
+                                    }},
+                                    prefill: {{
+                                        name: checkoutData.userName || '',
+                                    }},
+                                }};
+
+                                const razorpay = new window.Razorpay(options);
+                                razorpay.open();
+                            }});
+
+                            window.addEventListener('load', () => {{
+                                setTimeout(() => payButton.click(), 250);
+                            }});
+                        </script>
+                    </body>
+                </html>
+                """
+    )
 
 # Cancel booking
 @router.put("/user/bookings/{booking_id}/cancel")

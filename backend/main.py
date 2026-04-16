@@ -52,6 +52,22 @@ def run_startup_migrations() -> None:
         with engine.begin() as conn:
             conn.execute(text("ALTER TABLE users ADD COLUMN place_of_birth VARCHAR"))
 
+    booking_columns = {col["name"] for col in inspector.get_columns("bookings")}
+    booking_alterations = {
+        "payment_status": "ALTER TABLE bookings ADD COLUMN payment_status VARCHAR DEFAULT 'pending'",
+        "payment_amount": "ALTER TABLE bookings ADD COLUMN payment_amount FLOAT",
+        "payment_currency": "ALTER TABLE bookings ADD COLUMN payment_currency VARCHAR DEFAULT 'INR'",
+        "razorpay_order_id": "ALTER TABLE bookings ADD COLUMN razorpay_order_id VARCHAR(64)",
+        "razorpay_payment_id": "ALTER TABLE bookings ADD COLUMN razorpay_payment_id VARCHAR(64)",
+        "razorpay_signature": "ALTER TABLE bookings ADD COLUMN razorpay_signature VARCHAR(255)",
+        "paid_at": "ALTER TABLE bookings ADD COLUMN paid_at DATETIME",
+    }
+
+    for column_name, statement in booking_alterations.items():
+        if column_name not in booking_columns:
+            with engine.begin() as conn:
+                conn.execute(text(statement))
+
 
 run_startup_migrations()
 

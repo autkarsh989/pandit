@@ -5,8 +5,10 @@ import Card from '@/components/Card';
 import AppButton from '@/components/AppButton';
 import { colors, fonts, radius, spacing } from '@/constants/theme';
 import { apiGet, apiPost, apiPut } from '@/lib/api';
+import { API_BASE_URL } from '@/lib/config';
 import { useAuth } from '@/context/AuthContext';
 import { router } from 'expo-router';
+import { openBookingCheckout } from '@/lib/bookingPayments';
 
 type Booking = {
   id: string;
@@ -18,6 +20,7 @@ type Booking = {
   reviewed_by_user?: boolean;
   reviewed_by_pandit?: boolean;
   total_amount?: number;
+  payment_status?: string;
   service_address?: string;
   service_location_name?: string;
   pandit_id?: string;
@@ -35,6 +38,7 @@ export default function BookingsScreen() {
   const [reviewRating, setReviewRating] = useState('5');
   const [reviewComment, setReviewComment] = useState('');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [payingBookingId, setPayingBookingId] = useState('');
 
   useEffect(() => {
     if (!ready) return;
@@ -107,6 +111,19 @@ export default function BookingsScreen() {
   const openDetail = (booking: Booking) => {
     setSelectedBooking(booking);
     setDetailModal(true);
+  };
+
+  const payForBooking = async (booking: Booking) => {
+    if (!token) return;
+    setPayingBookingId(booking.id);
+    try {
+      await openBookingCheckout(`${API_BASE_URL}/user/bookings/${booking.id}/payment/checkout`);
+      await loadBookings();
+    } catch (error) {
+      console.error('Open payment checkout error', error);
+    } finally {
+      setPayingBookingId('');
+    }
   };
 
   const updateStatus = async (bookingId: string, action: 'confirm' | 'reject' | 'complete') => {
@@ -224,9 +241,19 @@ export default function BookingsScreen() {
               {new Date(booking.booking_date).toLocaleDateString()} •{' '}
               {new Date(booking.booking_date).toLocaleTimeString()}
             </Text>
+            {booking.payment_status && booking.payment_status !== 'paid' && booking.payment_status !== 'not_required' ? (
+              <Text style={styles.paymentText}>Payment: {booking.payment_status}</Text>
+            ) : null}
             <View style={styles.actions}>
               {!userType || userType === 'user' ? (
                 <>
+                  {booking.payment_status && booking.payment_status !== 'paid' && booking.payment_status !== 'not_required' ? (
+                    <AppButton
+                      title={payingBookingId === booking.id ? 'Opening...' : 'Pay Now'}
+                      onPress={() => payForBooking(booking)}
+                      disabled={payingBookingId === booking.id}
+                    />
+                  ) : null}
                   {booking.status === 'completed' && !booking.reviewed_by_user ? (
                     <AppButton title="Leave Review" variant="secondary" onPress={() => openReview(booking)} />
                   ) : null}
@@ -313,6 +340,9 @@ export default function BookingsScreen() {
                 {selectedBooking.total_amount ? (
                   <Text style={styles.detailText}>Amount: Rs {selectedBooking.total_amount}</Text>
                 ) : null}
+                {selectedBooking.payment_status ? (
+                  <Text style={styles.detailText}>Payment Status: {selectedBooking.payment_status}</Text>
+                ) : null}
                 {selectedBooking.service_address ? (
                   <Text style={styles.detailText}>Address: {selectedBooking.service_address}</Text>
                 ) : null}
@@ -383,6 +413,11 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: 12,
     color: colors.ink500,
+  },
+  paymentText: {
+    fontFamily: fonts.bodySemi,
+    fontSize: 12,
+    color: colors.orange600,
   },
   actions: {
     flexDirection: 'row',

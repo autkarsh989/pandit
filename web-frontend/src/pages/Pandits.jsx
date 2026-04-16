@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../api/config.js';
 import { getAuthToken } from '../api/client.js';
+import { createBooking as createBookingRequest, startRazorpayCheckout } from '../api/bookings.js';
 import { useFlashMessage } from '../hooks/useFlashMessage.js';
 
 export default function Pandits() {
@@ -19,6 +20,7 @@ export default function Pandits() {
   const [bookingServiceId, setBookingServiceId] = useState('');
   const [bookingDate, setBookingDate] = useState('');
   const [serviceAddress, setServiceAddress] = useState('');
+  const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [filters, setFilters] = useState({
     maxDistance: 50,
     minRating: 0,
@@ -219,31 +221,37 @@ export default function Pandits() {
       return;
     }
 
+    setBookingSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/user/bookings`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          pandit_id: selectedPanditId,
-          service_id: bookingServiceId,
-          booking_date: bookingDate,
-          service_address: serviceAddress,
-        }),
+      const response = await createBookingRequest({
+        pandit_id: selectedPanditId,
+        service_id: bookingServiceId,
+        booking_date: bookingDate,
+        service_address: serviceAddress,
       });
 
-      if (response.ok) {
-        showMessage('Booking created successfully!', 'success');
-        closeBookingModal();
-        setTimeout(() => navigate('/bookings'), 1500);
+      if (response.payment_required && response.payment) {
+        const checkoutResult = await startRazorpayCheckout({
+          bookingId: response.booking_id,
+          payment: response.payment,
+          token,
+          returnUrl: `${window.location.origin}/bookings`,
+        });
+
+        if (checkoutResult.verified) {
+          showMessage('Payment completed successfully!', 'success');
+        }
       } else {
-        showMessage('Error creating booking', 'error');
+        showMessage('Booking created successfully!', 'success');
       }
+
+      closeBookingModal();
+      setTimeout(() => navigate('/bookings'), 1200);
     } catch (error) {
-      showMessage('Error creating booking', 'error');
+      showMessage(error.message || 'Error creating booking', 'error');
       console.error('Create booking error:', error);
+    } finally {
+      setBookingSubmitting(false);
     }
   };
 
@@ -696,8 +704,8 @@ export default function Pandits() {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary">
-              Confirm Booking
+            <button type="submit" className="btn btn-primary" disabled={bookingSubmitting}>
+              {bookingSubmitting ? 'Processing Payment...' : 'Pay & Book'}
             </button>
           </form>
         </div>

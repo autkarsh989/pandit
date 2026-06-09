@@ -1,5 +1,6 @@
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 import { apiPost } from '@/lib/api';
 
 type PaymentInfo = {
@@ -37,7 +38,14 @@ export async function openBookingCheckout(
   checkoutUrl: string,
   returnUrl: string = Linking.createURL('/(tabs)/bookings')
 ) {
-  await WebBrowser.openBrowserAsync(buildCheckoutUrl(checkoutUrl, returnUrl));
+  const url = buildCheckoutUrl(checkoutUrl, returnUrl);
+
+  if (Platform.OS === 'web') {
+    await WebBrowser.openBrowserAsync(url);
+    return;
+  }
+
+  await WebBrowser.openAuthSessionAsync(url, returnUrl);
 }
 
 export async function createBookingWithPayment(
@@ -49,7 +57,11 @@ export async function createBookingWithPayment(
 
   if (response.payment_required && response.payment?.checkout_url) {
     const checkoutUrl = buildCheckoutUrl(response.payment.checkout_url, returnUrl);
-    await WebBrowser.openBrowserAsync(checkoutUrl);
+    if (Platform.OS === 'web') {
+      await WebBrowser.openBrowserAsync(checkoutUrl);
+    } else {
+      await WebBrowser.openAuthSessionAsync(checkoutUrl, returnUrl);
+    }
   }
 
   return response;

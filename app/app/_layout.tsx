@@ -17,6 +17,9 @@ import 'react-native-reanimated';
 
 import { AuthProvider } from '@/context/AuthContext';
 import { initializeDailyQuoteNotifications } from '@/lib/quoteNotifications';
+import * as WebBrowser from 'expo-web-browser';
+
+WebBrowser.maybeCompleteAuthSession();
 
 export { ErrorBoundary } from 'expo-router';
 
